@@ -1,0 +1,10 @@
+version: '3'
+services:
+  local-develop:
+    container_name: local-develop-terraform
+    build: ./cli
+    entrypoint: ash
+    tty: true
+    volumes:
+      - ../../:/root:cached
+    working_dir: /root

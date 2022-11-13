@@ -1,0 +1,38 @@
+# ==== Commit Messages ====
+
+# ==== Commit Messages(Template) ====
+# <type>[optional scope]: <description>
+#
+# [optional body]
+#
+# [optional footer(s)]
+
+# ==== Commit Messages(Sample/Line) ====
+# feat: #323 ユーザー登録機能の追加
+# feat(api): #842 ユーザー登録機能の更新
+
+# ==== Commit Messages(Sample/Lines) ====
+# fix: prevent racing of requests
+#
+# Introduce a request id and a reference to latest request. Dismiss
+# incoming responses other than from latest request.
+#
+# Remove timeouts which were used to mitigate the racing issue but are
+# obsolete now.
+#
+# Reviewed-by: Z
+# Refs: #123
+
+# ==== Prefix ====
+# feat: 機能追加、機能更新
+# fix: バグ修正
+# build: ビルド関連の変更
+# chore: ビルドツールやライブラリで自動生成されたものをコミットするとき
+# ci: CI関連の変更
+# docs: ドキュメントのみ修正
+# refactor: リファクタリング
+# perf: パフォーマンス関係の変更
+# test: テスト追加や間違っていたテストの修正
+
+# ==== Docs ====
+# [Conventional Commits](https://www.conventionalcommits.org/ja/v1.0.0/)

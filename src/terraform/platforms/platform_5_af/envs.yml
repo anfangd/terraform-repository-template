@@ -1,0 +1,11 @@
+production:
+  terraform:
+    backend:
+      bucket: "tfstate-platform-5-af-foundation-myteam"
+      key: "state/platform-5-af.tfstate"
+      region: "ap-northeast-1"
+      profile: "default"
+  aws:
+    account_id: "xxxxxxxx"
+    profile: "default"
+    region: "ap-northeast-1"

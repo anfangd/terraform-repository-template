@@ -51,6 +51,11 @@ task create-tfstate-bucket
 
 ## Development
 
+### Branch & Environment Strategy
+
+- main-feature branch
+- Use directories to control environment
+
 ### Test GitHub Actions Workflow
 
 Use Act

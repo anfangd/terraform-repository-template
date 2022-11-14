@@ -7,7 +7,7 @@ provider "aws" {
       Managed_by = "Terrform"
       Team = "infra"
       Scope = "Foundation"
-      Product = "platform_5_af"
+      Product = "platform_4_cr"
     }
   }
 }

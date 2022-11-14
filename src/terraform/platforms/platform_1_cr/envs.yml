@@ -1,8 +1,8 @@
 production:
   terraform:
     backend:
-      bucket: "tfstate-platform-5-af-foundation-myteam"
-      key: "state/platform-5-af.tfstate"
+      bucket: "tfstate-platform-1-cr-foundation-myteam"
+      key: "state/platform-1-cr.tfstate"
       region: "ap-northeast-1"
       profile: "default"
   aws:

@@ -1,0 +1,15 @@
+projects:
+  - name: code-resource
+    root_dir: platforms/code-resource
+
+  - name: monitoring
+    root_dir: platforms/monitoring
+
+  - name: platform_3_jc
+    root_dir: platforms/platform_3_jc
+
+  - name: infrastructure_1_di
+    root_dir: infrastructures/infrastructure_1_di
+
+  - name: service_a
+    root_dir: services/Service_A

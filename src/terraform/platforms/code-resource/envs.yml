@@ -1,11 +1,12 @@
-production:
-  terraform:
-    backend:
-      bucket: "tfstate-platform-1-cr-foundation-myteam"
-      key: "state/platform/code-resource.tfstate"
-      region: "ap-northeast-1"
+environments:
+  - production:
+    terraform:
+      backend:
+        bucket: "tfstate-platform-1-cr-foundation-myteam"
+        key: "state/platform/code-resource.tfstate"
+        region: "ap-northeast-1"
+        profile: "default"
+    aws:
+      account_id: "xxxxxxxx"
       profile: "default"
-  aws:
-    account_id: "xxxxxxxx"
-    profile: "default"
-    region: "ap-northeast-1"
+      region: "ap-northeast-1"

@@ -3,7 +3,7 @@ environments:
     terraform:
       backend:
         bucket: ""
-        key: "state/platform/platform_3_jc.tfstate"
+        key: "state/service/Service_A.tfstate"
         region: "ap-northeast-1"
         profile: "default"
     aws:
@@ -15,7 +15,7 @@ environments:
     terraform:
       backend:
         bucket: ""
-        key: "state/platform/platform_3_jc.tfstate"
+        key: "state/service/Service_A.tfstate"
         region: "ap-northeast-1"
         profile: "default"
     aws:
@@ -27,7 +27,7 @@ environments:
     terraform:
       backend:
         bucket: ""
-        key: "state/platform/platform_3_jc.tfstate"
+        key: "state/service/Service_A.tfstate"
         region: "ap-northeast-1"
         profile: "default"
     aws:

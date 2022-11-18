@@ -6,5 +6,5 @@ services:
     entrypoint: ash
     tty: true
     volumes:
-      - ../../:/root:cached
+      - ../../src:/root:cached
     working_dir: /root

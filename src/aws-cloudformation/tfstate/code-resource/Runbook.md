@@ -39,9 +39,13 @@ EOS
 )
 echo $JSON | jq '.[]'
 
+aws_profile='my_aws_profile'
+stack_name='terraform-s3-backend'
+template_file_path='../template/cfn-tfstate-s3.yaml'
+
 aws cloudformation create-stack \
-    --profile xxx
-    --stack-name tf-s3-backend \
-    --template-body file://../template/cfn-tfstate-s3.yaml \
-    --parameters $(echo $JSON | jq -r '.[] | .Key + "=" +.Value' | xargs echo | sed -e 's/ /,/g')
+    --profile "${aws_profile}" \
+    --stack-name "${stack_name{" \
+    --template-body "file://${template_file_path}" \
+    --parameters $(echo $json | jq -r '.[] | .Key + "=" +.Value' | xargs echo | sed -e 's/ /,/g')
 ```

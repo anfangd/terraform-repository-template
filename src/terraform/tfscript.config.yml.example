@@ -1,0 +1,3 @@
+projects:
+  - name: project-name
+    root_dir: root/dir

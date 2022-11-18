@@ -13,3 +13,6 @@ projects:
 
   - name: service_a
     root_dir: services/Service_A
+
+  - name: site_a
+    root_dir: web-site/site-a

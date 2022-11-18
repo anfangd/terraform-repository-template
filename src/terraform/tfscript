@@ -6,11 +6,15 @@ TFS_VERSION=0.0.1
 
 EXECURTE_COMMAND=tfscript
 
-CH_DIRS=()
-TFW_TEMPLATES=()
-TFW_VARFILE=()
-OPTS=("")
+CH_DIR=
+CH_DIR_COUNT=0
+TFS_ENV=
+TFS_ENV_COUNT=0
+TFS_LAYER=()
+TFS_LAYER_ALL_FLG=0
+OPTS=()
 SUB_COMMANDS=()
+BACKEND_CONFIGS=
 
 CURRENT_DIRECTORY=$(pwd)
 
@@ -27,20 +31,22 @@ EOS
 }
 
 #
+# Scan necessarly commands.
 #
-#
-function scan_command() {
+function scan_commands() {
 
     commands=(
         "tfenv"
         "tflint"
         "tfupdate"
+        "tfsec"
         "jq"
+        "yq"
     )
     set +e
     for command in "${commands[@]}"; do
-        which "${command}" > /dev/null
-        if [ ! "$?" ]; then
+        
+        if ! which "${command}" > /dev/null ; then
             echo "" >&2
             echo "Erorr: There is no ${command} command." >&2
             echo "" >&2
@@ -51,84 +57,102 @@ function scan_command() {
 }
 
 #
-#
+# Check: Command Arguments
 #
 function parse_args() {
 
     COMMAND_LENGTH=0
     EXECURTE_COMMAND=tfscript
-    return
-    while (( $# > 0))
+    while (( $# > 0 ))
     do
         case "$1" in
             -d | -dir | --dir=*)
+                set +u
                 # https://fumiyas.github.io/2013/12/15/test.sh-advent-calendar.html
                 if [[ "$1" =~ ^--dir= ]]; then
-                    CH_DIRS+=($( echo $1 | sed -e 's/^--dir=//'))
+                    CH_DIR="${1//--dir=/}"
+                    (( ++CH_DIR_COUNT ))
                 elif [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]]; then
                     echo "" >&2
-                    echo "'option' required an argument." >&2
+                    echo "ERROR: $1 option is required an argument." >&2
                     echo "" >&2
                     exit 1
                 else
-                    CH_DIRS+=("$2")
+                    CH_DIR="$2"
+                    (( ++CH_DIR_COUNT ))
                     shift
                 fi
+                set -u
                 ;;
-            -tt | --tfw-template=*)
-                if [[ "$1" =~ ^--tfw-template ]]; then
-                    TFW_TEMPLATES+=($( echo $1 | sed -e 's/^--tfw-template=//'))
+            -e | --env | --env=*)
+                set +u
+                if [[ "$1" =~ ^--env ]]; then
+                    TFS_ENV="${1//--env=/}"
+                    (( ++TFS_ENV_COUNT ))
                 elif [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]]; then
                     echo "" >&2
-                    echo "'option' required an argument." >&2
+                    echo "ERROR: $1 option is required an argument." >&2
                     echo "" >&2
                     exit 1
                 else
-                    TFW_TEMPLATES+=("$2")
+                    TFS_ENV=("$2")
+                    (( ++TFS_ENV_COUNT ))
                     shift
                 fi
+                set -u
                 ;;
-            -tv | --tfw-varfile=*)
-                if [[ "$1" =~ ^--tfw- ]]; then
-                    TFW_VARFILE+=($( echo $1 | sed -e 's/^--tfw-varfile=//'))
+            -l | --layer | --layer=*)
+                set +u
+                if [[ "$1" =~ ^--layer ]]; then
+                    TFS_LAYER+=("${1//--layer/}")
                 elif [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]]; then
                     echo "" >&2
-                    echo "'option' required an argument." >&2
+                    echo "ERROR: $1 option is required some arguments." >&2
                     echo "" >&2
                     exit 1
                 else
-                    TFW_VARFILE+=("$2")
+                    TFS_LAYER+=("$2")
                     shift
                 fi
+                set -u
                 ;;
+            -al | --all-layer)
+                set +u
+                TFS_LAYER_ALL_FLG=1
+                set -u
+            ;;
             -*)
                 OPTS+=("$1")
                 ;;
             config)
                 echo config
-                let ++COMMAND_LENGTH
-                EXECURTE_COMMAND=tfwrapper_config
+                (( ++COMMAND_LENGTH ))
+                EXECURTE_COMMAND=tfscript_config
                 ;;
             diff)
                 echo scan diff
-                let ++COMMAND_LENGTH
-                EXECURTE_COMMAND=tfwrapper_diff
+                (( ++COMMAND_LENGTH ))
+                EXECURTE_COMMAND=tfscript_diff
                 ;;
             lint)
-                let ++COMMAND_LENGTH
+                (( ++COMMAND_LENGTH ))
                 EXECURTE_COMMAND=tflint
                 ;;
             update)
-                let ++COMMAND_LENGTH
+                (( ++COMMAND_LENGTH ))
                 EXECURTE_COMMAND=tfupdate
                 ;;
-            init | validate | plan | apply | destroy | fmt | import | show | test | version )
-                let ++COMMAND_LENGTH
+            sec)
+                (( ++COMMAND_LENGTH ))
+                EXECURTE_COMMAND=tfsec
+                ;;
+            validate | plan | apply | destroy | fmt | import | show | version )
+                (( ++COMMAND_LENGTH ))
                 EXECURTE_COMMAND="terraform"
                 SUB_COMMANDS+=("$1")
                 ;;
             providers)
-                let ++COMMAND_LENGTH
+                (( ++COMMAND_LENGTH ))
                 EXECURTE_COMMAND="terraform"
                 SUB_COMMANDS+=("$1")
                 case "$2" in
@@ -139,7 +163,7 @@ function parse_args() {
                 esac
                 ;;
             state)
-                let ++COMMAND_LENGTH
+                (( ++COMMAND_LENGTH ))
                 EXECURTE_COMMAND="terraform"
                 SUB_COMMANDS+=("$1")
                 case "$2" in
@@ -150,7 +174,7 @@ function parse_args() {
                 esac
                 ;;
             workspace)
-                let ++COMMAND_LENGTH
+                (( ++COMMAND_LENGTH ))
                 EXECURTE_COMMAND="terraform"
                 SUB_COMMANDS+=("$1")
                 case "$2" in
@@ -162,14 +186,15 @@ function parse_args() {
                 ;;
             *)
                 SUB_COMMANDS+=("$1")
+                echo "subcommands" $1
                 ;;
         esac
         shift
     done
 
-    if [ $COMMAND_LENGTH -gt 1 ]; then
+    if [ "$COMMAND_LENGTH" -gt 1 ]; then
         echo "" >&2
-        echo "Error: Too many command line arguments" 1>&2
+        echo "ERROR: Too many command line arguments." 1>&2
         echo "" >&2
         exit 126
     fi
@@ -192,144 +217,198 @@ function read_envs() {
 }
 
 #
+# Check: tfscript.config.yml
 #
-#
-function tfwrapper_config() {
-    echo "tfwapper:tfwapper_config"
+function tfscript_config() {
 
-    if [ -f "${CURRENT_DIRECTORY}/.tfwrapper/config.json" ]; then
-        echo There is config file.
-        cat "${CURRENT_DIRECTORY}/.tfwrapper/config.json" | jq -r '.TFWProject.Name'
+    if [ -f "${CURRENT_DIRECTORY}/tfscript.config.yml" ]; then
+        yq -r '.' < "${CURRENT_DIRECTORY}/tfscript.config.yml"
     else
-        echo There is no config file.
+        echo "" >&2
+        echo "There is no config file." >&2
+        echo "" >&2
     fi
 }
 
 #
 #
 #
-function tfwrapper_diff() {
-    echo "tfwapper:tfwapper_diff"
-    echo "tfwrapper:execute_diff terraform plan)"
-    echo "tfwrapper:execute_diff if ret_val=1, there is error"
-    echo "tfwrapper:execute_diff if ret_val=2, there is diff"
+function tfscript_diff() {
+    echo "tfscript:tfscript_diff"
+    echo "tfscript:execute_diff terraform plan)"
+    echo "tfscript:execute_diff if ret_val=1, there is error"
+    echo "tfscript:execute_diff if ret_val=2, there is diff"
+    pwd
 }
 
 #
-#
+# Command: tflint
 #
 function execute_tflint() {
-    echo "tfwrapper:execute_tflint"
-    TF_OPTION=$(echo ${OPTS[@]})
-    TF_SUB_COMMANDS=$(echo ${SUB_COMMANDS})
-    echo "tfwrapper:execute_tflint tflint $(echo ${TF_SUB_COMMANDS[@]}) ${TF_OPTION}"
+    echo "tfscript:execute_tflint"
+    TF_OPTION=("${OPTS[*]:-}")
+    TF_SUB_COMMANDS=("${SUB_COMMANDS:-}")
+    echo "tfscript:execute_tflint tflint ${TF_SUB_COMMANDS[*]:-} ${TF_OPTION[*]:-}"
+    eval tflint "${TF_SUB_COMMANDS[*]:-} ${TF_OPTION[*]:-}"
 }
 
 #
-#
+# Command: tfupdate
 #
 function execute_tfupdate() {
-    echo "tfwrapper:execute_tfupdate"
-    TF_OPTION=$(echo ${OPTS[@]})
-    TF_SUB_COMMANDS=$(echo ${SUB_COMMANDS})
-    echo "tfwrapper:execute_tfupdate tfupdate $(echo ${TF_SUB_COMMANDS[@]}) ${TF_OPTION}"
+    echo "tfscript:execute_tfupdate"
+    TF_OPTION=("${OPTS[*]:-}")
+    TF_SUB_COMMANDS=("${SUB_COMMANDS[*]:-}")
+    echo "tfscript:execute_tfupdate tfupdate ${TF_SUB_COMMANDS[*]:-} ${TF_OPTION[*]:-}"
+    #eval tfupdate "${TF_SUB_COMMANDS[*]:-} ${TF_OPTION[*]:-}"
+    tfupdate terraform .
 }
 
 #
+# Command: tfsec
 #
+function execute_tfsec() {
+    echo "tfscript:execute_tfsec"
+    TF_OPTION=("${OPTS[*]:-}")
+    TF_SUB_COMMANDS=("${SUB_COMMANDS[*]:-}")
+    echo "tfscript:execute_tfsec tfsec ${TF_SUB_COMMANDS[*]:-} ${TF_OPTION[*]:-}"
+    #eval tfsec "${TF_SUB_COMMANDS[*]:-} ${TF_OPTION[*]:-}"
+    tfsec
+}
+
+#
+# Command: terarform
 #
 function execute_terraform() {
 
-    TF_OPTION=$(echo ${OPTS[@]})
-    TF_SUB_COMMANDS=$(echo ${SUB_COMMANDS[@]})
-    echo "# Execute: terraform $(echo ${TF_SUB_COMMANDS[@]}) ${TF_OPTION}"
-    echo "# Dir: ${dir}"
+    TF_OPTION=("${OPTS[*]:-}")
+    TF_SUB_COMMANDS=("${SUB_COMMANDS[*]:-}")
+    echo "#"
+    echo "# Execute: terraform ${TF_SUB_COMMANDS[*]:-} ${TF_OPTION[*]:-} ${BACKEND_CONFIGS}"
     echo "# Plugin Cache: ${TF_PLUGIN_CACHE_DIR:-(none)}"
-    eval "terraform fmt" > /dev/null
-    eval "terraform $(echo ${TF_SUB_COMMANDS[@]}) ${TF_OPTION}"
+    echo ""
+    eval "terraform fmt -recursive" > /dev/null
+    terraform init "${BACKEND_CONFIGS}"
+    eval "terraform ${TF_SUB_COMMANDS[*]:-} ${TF_OPTION[*]:-}"
 }
 
 #
 #
 #
 function main() {
-    echo "This is main function."
-    echo ""
-    echo "# Current dir:" ${CURRENT_DIRECTORY}
+
     echo "#"
-    echo "# Execute Commands: ${EXECURTE_COMMAND} $(echo ${SUB_COMMANDS[@]})"
-    echo "# Options: $(echo ${OPTS[@]:-(none)})"
+    echo "# Current dir: ${CURRENT_DIRECTORY}"
+    echo "#"
+    echo "# Execute Commands: ${EXECURTE_COMMAND} ${SUB_COMMANDS[*]:-}"
+    echo "# Options: ${OPTS[*]:-(none)}"
     echo "#"
 
     case "$EXECURTE_COMMAND" in
-        tfwrapper_config)
-            tfwrapper_config
+        tfscript_config)
+            tfscript_config
             exit 0
             ;;
     esac
 
-    for dir in ${TFW_TEMPLATES[@]+"${TFW_TEMPLATES[@]}"}
-    do
-        if [ ! -d "${CURRENT_DIRECTORY}/${dir}" ]; then
-            echo "" >&2
-            echo Invalid directory path $dir >&2
-            echo "" >&2
-            exit 1
-        fi
-    done
-    echo "# Source of TF Template Dirs: $(echo ${TFW_TEMPLATES[@]:-(none)})"
-
-    for dir in ${TFW_VARFILE[@]+"${TFW_VARFILE[@]}"}
-    do
-        if [ ! -d "${CURRENT_DIRECTORY}/${dir}" ]; then
-            echo "" >&2
-            echo Invalid directory path $dir >&2
-            echo "" >&2
-            exit 1
-        fi
-    done
-    echo "# Source of TF VarFile Dirs: $(echo ${TFW_VARFILE[@]:-(none)})"
-
-    for dir in ${CH_DIRS[@]+"${CH_DIRS[@]}"}
-    do
-        if [ ! -d "${CURRENT_DIRECTORY}/${dir}" ]; then
-            echo "" >&2
-            echo Invalid directory path $dir >&2
-            echo "" >&2
-            exit 1
-        fi
-    done
-    echo "# Target Dirs: ${CH_DIRS[@]:-(none)}"
-    echo "#"
-
-    if [ ! ${CH_DIRS[@]+"${CH_DIRS[@]}"} ]; then
+    #
+    # Check: Target Project Directory
+    #
+    if [ ! "${CH_DIR}" ]; then
         echo "" >&2
-        echo "Error: Target directory is not set." >&2
+        echo "ERROR: Target directory is not set." >&2
         echo ""
         echo "  Please set -d DIR option to execute ${EXECURTE_COMMAND}" >&2
         echo "" >&2
+        exit 128
+    fi
+    if [ "$CH_DIR_COUNT" -gt 1 ]; then
+        echo "" >&2
+        echo "ERROR: To many -d options." >&2
+        echo "" >&2
+        exit 128
+    fi
+    if [ ! -d "${CURRENT_DIRECTORY}/${CH_DIR}" ]; then
+        echo "" >&2
+        echo "ERROR: Invalid directory path $CH_DIR" >&2
+        echo "" >&2
         exit 1
     fi
+    echo "# Project    : ${CH_DIR}"
+
+    #
+    # Check: Project envs.yml File
+    #
+    if [ ! -f "${CURRENT_DIRECTORY}/${CH_DIR}/envs.yml" ]; then
+        echo "" >&2
+        echo "ERROR: There is no env.yml file in ${CH_DIR}." >&2
+        echo "" >&2
+        exit 1
+    fi
+    if [ "$(yq -r ".environments.${TFS_ENV}" < "${CURRENT_DIRECTORY}/${CH_DIR}/envs.yml")" = "null" ]; then
+        echo "" >&2
+        echo "ERROR: There is no ${TFS_ENV} parameter in ${CURRENT_DIRECTORY}/${CH_DIR}/envs.yml" >&2
+        echo "" >&2
+        exit 1
+    fi
+    BACKEND_CONFIGS=$(yq '.environments.production | 
+        "-backend-config=\"bucket=" + .terraform.backend.bucket + "\" -backend-config=\"key=" + .terraform.backend.key + "\" -backend-config=\"region=" + .terraform.backend.region + "\" -backend-config=\"profile=" + .terraform.backend.profile + "\""' \
+        < "${CURRENT_DIRECTORY}/${CH_DIR}/envs.yml")
+
+    #
+    # Check: Target Project Environment
+    #
+    if [ ! "$TFS_ENV" ]; then
+        echo "" >&2
+        echo "ERROR: Target Project Environment is not set." >&2
+        echo ""
+        echo "  Please set -e ENVRIRONMENT option to execute ${EXECURTE_COMMAND}" >&2
+        echo "" >&2
+        exit 128
+    fi
+    if [ "$TFS_ENV_COUNT" -gt 1 ]; then
+        echo "" >&2
+        echo "ERROR: To many -e options." >&2
+        echo "" >&2
+        exit 128
+    fi
+    if [ ! -d "${CURRENT_DIRECTORY}/${CH_DIR}/environments/${TFS_ENV}" ]; then
+        echo "" >&2
+        echo "ERROR: Invalid directory path." >&2
+        echo "" >&2
+        echo "  There is no directory named ${CH_DIR}/environments/${TFS_ENV}" >&2
+        echo "" >&2
+        exit 1
+    fi
+    echo "# Environment: ${TFS_ENV}"
+
+    #
+    # Check: Target Project's Layer
+    #
+    for dir in ${TFS_LAYER[@]+"${TFS_LAYER[@]}"}
+    do
+        if [ ! -d "${CURRENT_DIRECTORY}/${CH_DIR}/environments/${TFS_ENV}/${dir}" ]; then
+            echo "" >&2
+            echo "ERROR: Invalid Layer Name." >&2
+            echo "" >&2
+            echo "  $dir is wrong name." >&2
+            echo "" >&2
+            exit 1
+        fi
+    done
+    if [ $TFS_LAYER_ALL_FLG -ne 0 ]; then
+        TFS_LAYER=($(ls "${CURRENT_DIRECTORY}/${CH_DIR}/environments/${TFS_ENV}/"))
+    fi
+    echo "# Layers     : ${TFS_LAYER[*]:-(none)}"
 
     set +e
-    for dir in ${CH_DIRS[@]+"${CH_DIRS[@]}"}
+    for dir in ${TFS_LAYER[@]+"${TFS_LAYER[@]}"}
     do
-        cd "${CURRENT_DIRECTORY}/${dir}"
-
-        for template in ${TFW_TEMPLATES[@]+"${TFW_TEMPLATES[@]}"}
-        do
-            mkdir -p .tf_template
-            cp -fp ${CURRENT_DIRECTORY}/${template}/* ./.tf_template/
-        done
-        for varfile in ${TFW_VARFILE[@]+"${TFW_VARFILE[@]}"}
-        do
-            mkdir -p .tf_varfile
-            cp -fp ${CURRENT_DIRECTORY}/${varfile}/* ./.tf_varfile/
-        done
+        cd "${CURRENT_DIRECTORY}/${CH_DIR}/environments/${TFS_ENV}/${dir}"
 
         case "$EXECURTE_COMMAND" in
-            tfwrapper_diff)
-                tfwrapper_diff
+            tfscript_diff)
+                tfscript_diff
                 ;;
             tflint)
                 execute_tflint
@@ -337,23 +416,19 @@ function main() {
             tfupdate)
                 execute_tfupdate
                 ;;
+            tfsec)
+                execute_tfsec
+                ;;
             terraform)
                 execute_terraform
                 ;;
             *)
                 echo "" >&2
-                echo "Error: There is no tfwrapper ${SUB_COMMANDS}." >&2
+                echo "ERROR: There is no tfscript ${SUB_COMMANDS:-(none)}." >&2
                 echo "" >&2
                 usage
                 ;;
         esac
-
-        if [ ${TFW_TEMPLATES[@]+"${TFW_TEMPLATES[@]}"} ]; then
-            rm -rf ./.tf_template/
-        fi
-        if [ ${TFW_VARFILE[@]+"${TFW_VARFILE[@]}"} ]; then
-            rm -rf ./.tf_varfile/
-        fi
 
         cd "${CURRENT_DIRECTORY}"
     done
@@ -361,10 +436,13 @@ function main() {
 
 }
 
+#
 # Entrypoint
+#
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    echo "# This is entrypoint."
-    scan_command
+    scan_commands
     parse_args "$@"
-    # main
+    main
+
+    exit 0
 fi

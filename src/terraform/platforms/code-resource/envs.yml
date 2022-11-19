@@ -1,5 +1,5 @@
 environments:
-  - production:
+  production:
     terraform:
       backend:
         bucket: "tfstate-platform-1-cr-foundation-myteam"

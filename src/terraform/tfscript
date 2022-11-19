@@ -24,10 +24,52 @@ CURRENT_DIRECTORY=$(pwd)
 function usage() {
   cat <<EOS >&2
 
-Usage: $0 [global options] <subcommand> [args]
+Usage: $0 <subcommand> -d <working directory> -e <environment name> -l <layer name> [args]
+
+        The Terraform wapper Script is a wrapper script for 
+        executing terraform.
+
+Subcommands:
+        validate   Execute 'terraform validate'
+        plan       Execute 'terraform plan'
+        apply      Execute 'terraform apply'
+        destroy    Execute 'terraform destroy'
+        fmt        Execute 'terraform fmt'
+        import     Execute 'terraform import'
+        show       Execute 'terraform show'
+        test       Execute 'terraform test'
+        version    Execute 'terraform version'
+        providers  Execute 'terraform providers'
+        state      Execute 'terraform state'
+        workspace  Execute 'terraform workspace'
+        config     Show config
+        lint       Execute 'tflint'
+        update     Execute 'tfupdate'
+        sec        Execute 'tfsec'
+
+OPTIONS
+        -d | --dir | --dir= (string)
+        
+        Switch to a different working directory before executing the
+        given subcommand.
+
+        -e | --env | --env= (string)
+
+        Environment Name
+
+        -l | --layer | --layer= (string)
+
+        Layer Name
+
+        -al | --all-layer (string)
+        
+        Target All Layer under specific environment
+
+EXAMPLE
+        tfscript plan -t platforms/code-resource -e production -l setup
 
 EOS
-  exit 1
+  exit 128
 }
 
 #
@@ -86,7 +128,7 @@ function parse_args() {
                 ;;
             -e | --env | --env=*)
                 set +u
-                if [[ "$1" =~ ^--env ]]; then
+                if [[ "$1" =~ ^--env= ]]; then
                     TFS_ENV="${1//--env=/}"
                     (( ++TFS_ENV_COUNT ))
                 elif [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]]; then
@@ -103,8 +145,8 @@ function parse_args() {
                 ;;
             -l | --layer | --layer=*)
                 set +u
-                if [[ "$1" =~ ^--layer ]]; then
-                    TFS_LAYER+=("${1//--layer/}")
+                if [[ "$1" =~ ^--layer= ]]; then
+                    TFS_LAYER+=("${1#--layer=}")
                 elif [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]]; then
                     echo "" >&2
                     echo "ERROR: $1 option is required some arguments." >&2
@@ -125,14 +167,8 @@ function parse_args() {
                 OPTS+=("$1")
                 ;;
             config)
-                echo config
                 (( ++COMMAND_LENGTH ))
                 EXECURTE_COMMAND=tfscript_config
-                ;;
-            diff)
-                echo scan diff
-                (( ++COMMAND_LENGTH ))
-                EXECURTE_COMMAND=tfscript_diff
                 ;;
             lint)
                 (( ++COMMAND_LENGTH ))
@@ -186,7 +222,6 @@ function parse_args() {
                 ;;
             *)
                 SUB_COMMANDS+=("$1")
-                echo "subcommands" $1
                 ;;
         esac
         shift
@@ -198,22 +233,9 @@ function parse_args() {
         echo "" >&2
         exit 126
     fi
-
-    #usage
-}
-
-#
-#
-#
-function read_config() {
-    echo "This is read_config function."
-}
-
-#
-#
-#
-function read_envs() {
-    echo "This is read_envs functioon."
+    if [ "$COMMAND_LENGTH" -eq 0 ]; then
+        usage
+    fi
 }
 
 #
@@ -225,20 +247,10 @@ function tfscript_config() {
         yq -r '.' < "${CURRENT_DIRECTORY}/tfscript.config.yml"
     else
         echo "" >&2
-        echo "There is no config file." >&2
+        echo "ERROR: There is no config file." >&2
         echo "" >&2
+        exit 1
     fi
-}
-
-#
-#
-#
-function tfscript_diff() {
-    echo "tfscript:tfscript_diff"
-    echo "tfscript:execute_diff terraform plan)"
-    echo "tfscript:execute_diff if ret_val=1, there is error"
-    echo "tfscript:execute_diff if ret_val=2, there is diff"
-    pwd
 }
 
 #
@@ -284,16 +296,21 @@ function execute_terraform() {
     TF_OPTION=("${OPTS[*]:-}")
     TF_SUB_COMMANDS=("${SUB_COMMANDS[*]:-}")
     echo "#"
-    echo "# Execute: terraform ${TF_SUB_COMMANDS[*]:-} ${TF_OPTION[*]:-} ${BACKEND_CONFIGS}"
+    echo "# Execute     : terraform ${TF_SUB_COMMANDS[*]:-} ${TF_OPTION[*]:-}"
     echo "# Plugin Cache: ${TF_PLUGIN_CACHE_DIR:-(none)}"
-    echo ""
+    echo "#"
+    echo "# terraform version: $(cat .terraform-version)"
+    eval tfenv install > /dev/null
     eval "terraform fmt -recursive" > /dev/null
-    terraform init "${BACKEND_CONFIGS}"
+    echo "# Terraform Configs: ${BACKEND_CONFIGS}"
+    echo "#"
+    echo ""
+    eval terraform init "${BACKEND_CONFIGS}" -backend=true -force-copy -reconfigure
     eval "terraform ${TF_SUB_COMMANDS[*]:-} ${TF_OPTION[*]:-}"
 }
 
 #
-#
+# Main Function
 #
 function main() {
 
@@ -301,7 +318,7 @@ function main() {
     echo "# Current dir: ${CURRENT_DIRECTORY}"
     echo "#"
     echo "# Execute Commands: ${EXECURTE_COMMAND} ${SUB_COMMANDS[*]:-}"
-    echo "# Options: ${OPTS[*]:-(none)}"
+    echo "# Options         : ${OPTS[*]:-(none)}"
     echo "#"
 
     case "$EXECURTE_COMMAND" in
@@ -400,7 +417,18 @@ function main() {
         TFS_LAYER=($(ls "${CURRENT_DIRECTORY}/${CH_DIR}/environments/${TFS_ENV}/"))
     fi
     echo "# Layers     : ${TFS_LAYER[*]:-(none)}"
+    if [ "${TFS_LAYER[*]:-(none)}" = '(none)' ]; then
+        echo "" >&2
+        echo "ERROR: Lack of layer target."
+        echo "" >&2
+        echo "  You must to set -l <layer name> or -al ."
+        echo "" >&2
+        exit 128
+    fi
 
+    #
+    # Core Procedure
+    #
     set +e
     for dir in ${TFS_LAYER[@]+"${TFS_LAYER[@]}"}
     do

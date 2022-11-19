@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+commit_message=$(cat "$1")
+
+valid_regex='^fix|feat|build|chore|ci|docs|style|refactor|perf|test.+'
+
+if [[ ! $commit_message =~ $valid_regex ]]; then
+	echo >&2 "ERROR: Wrong Commit Message Format. Commit message in this project must adhere to this contract: $valid_regex."
+	exit 1
+fi
+
+exit 0

@@ -1,0 +1,36 @@
+environments:
+  - production:
+    terraform:
+      backend:
+        bucket: ""
+        key: "state/platform/platform_3_jc.tfstate"
+        region: "ap-northeast-1"
+        profile: "default"
+    aws:
+      account_id: "xxxxxxxx"
+      profile: "default"
+      region: "ap-northeast-1"
+
+  - pre-production:
+    terraform:
+      backend:
+        bucket: ""
+        key: "state/platform/platform_3_jc.tfstate"
+        region: "ap-northeast-1"
+        profile: "default"
+    aws:
+      account_id: "xxxxxxxx"
+      profile: "default"
+      region: "ap-northeast-1"
+
+  - development:
+    terraform:
+      backend:
+        bucket: ""
+        key: "state/platform/platform_3_jc.tfstate"
+        region: "ap-northeast-1"
+        profile: "default"
+    aws:
+      account_id: "xxxxxxxx"
+      profile: "default"
+      region: "ap-northeast-1"

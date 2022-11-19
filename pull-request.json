@@ -1,0 +1,10 @@
+{
+  "pull_request": {
+    "head": {
+      "ref": "feature/first_branch"
+    },
+    "base": {
+      "ref": "main"
+    }
+  }
+}

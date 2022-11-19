@@ -1,0 +1,12 @@
+environments:
+  production:
+    terraform:
+      backend:
+        bucket: "d"
+        key: "state/platform/monitoring.tfstate"
+        region: "ap-northeast-1"
+        profile: "default"
+    aws:
+      account_id: "xxxxxxxx"
+      profile: "default"
+      region: "ap-northeast-1"

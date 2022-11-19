@@ -1,0 +1,476 @@
+#!/usr/bin/env bash
+
+set -euC
+
+TFS_VERSION=0.0.1
+
+EXECURTE_COMMAND=tfscript
+
+CH_DIR=
+CH_DIR_COUNT=0
+TFS_ENV=
+TFS_ENV_COUNT=0
+TFS_LAYER=()
+TFS_LAYER_ALL_FLG=0
+OPTS=()
+SUB_COMMANDS=()
+BACKEND_CONFIGS=
+
+CURRENT_DIRECTORY=$(pwd)
+
+#
+# Exit with error displaying usage.
+#
+function usage() {
+  cat <<EOS >&2
+
+Usage: $0 <subcommand> -d <working directory> -e <environment name> -l <layer name> [args]
+
+        The Terraform wapper Script is a wrapper script for 
+        executing terraform.
+
+Subcommands:
+        validate   Execute 'terraform validate'
+        plan       Execute 'terraform plan'
+        apply      Execute 'terraform apply'
+        destroy    Execute 'terraform destroy'
+        fmt        Execute 'terraform fmt'
+        import     Execute 'terraform import'
+        show       Execute 'terraform show'
+        test       Execute 'terraform test'
+        version    Execute 'terraform version'
+        providers  Execute 'terraform providers'
+        state      Execute 'terraform state'
+        workspace  Execute 'terraform workspace'
+        config     Show config
+        lint       Execute 'tflint'
+        update     Execute 'tfupdate'
+        sec        Execute 'tfsec'
+
+OPTIONS
+        -d | --dir | --dir= (string)
+        
+        Switch to a different working directory before executing the
+        given subcommand.
+
+        -e | --env | --env= (string)
+
+        Environment Name
+
+        -l | --layer | --layer= (string)
+
+        Layer Name
+
+        -al | --all-layer (string)
+        
+        Target All Layer under specific environment
+
+EXAMPLE
+        tfscript plan -t platforms/code-resource -e production -l setup
+
+EOS
+  exit 128
+}
+
+#
+# Scan necessarly commands.
+#
+function scan_commands() {
+
+    commands=(
+        "tfenv"
+        "tflint"
+        "tfupdate"
+        "tfsec"
+        "jq"
+        "yq"
+    )
+    set +e
+    for command in "${commands[@]}"; do
+        
+        if ! which "${command}" > /dev/null ; then
+            echo "" >&2
+            echo "Erorr: There is no ${command} command." >&2
+            echo "" >&2
+            exit 126
+        fi
+    done
+    set -e
+}
+
+#
+# Check: Command Arguments
+#
+function parse_args() {
+
+    COMMAND_LENGTH=0
+    EXECURTE_COMMAND=tfscript
+    while (( $# > 0 ))
+    do
+        case "$1" in
+            -d | -dir | --dir=*)
+                set +u
+                # https://fumiyas.github.io/2013/12/15/test.sh-advent-calendar.html
+                if [[ "$1" =~ ^--dir= ]]; then
+                    CH_DIR="${1//--dir=/}"
+                    (( ++CH_DIR_COUNT ))
+                elif [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]]; then
+                    echo "" >&2
+                    echo "ERROR: $1 option is required an argument." >&2
+                    echo "" >&2
+                    exit 1
+                else
+                    CH_DIR="$2"
+                    (( ++CH_DIR_COUNT ))
+                    shift
+                fi
+                set -u
+                ;;
+            -e | --env | --env=*)
+                set +u
+                if [[ "$1" =~ ^--env= ]]; then
+                    TFS_ENV="${1//--env=/}"
+                    (( ++TFS_ENV_COUNT ))
+                elif [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]]; then
+                    echo "" >&2
+                    echo "ERROR: $1 option is required an argument." >&2
+                    echo "" >&2
+                    exit 1
+                else
+                    TFS_ENV=("$2")
+                    (( ++TFS_ENV_COUNT ))
+                    shift
+                fi
+                set -u
+                ;;
+            -l | --layer | --layer=*)
+                set +u
+                if [[ "$1" =~ ^--layer= ]]; then
+                    TFS_LAYER+=("${1#--layer=}")
+                elif [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]]; then
+                    echo "" >&2
+                    echo "ERROR: $1 option is required some arguments." >&2
+                    echo "" >&2
+                    exit 1
+                else
+                    TFS_LAYER+=("$2")
+                    shift
+                fi
+                set -u
+                ;;
+            -al | --all-layer)
+                set +u
+                TFS_LAYER_ALL_FLG=1
+                set -u
+            ;;
+            -*)
+                OPTS+=("$1")
+                ;;
+            config)
+                (( ++COMMAND_LENGTH ))
+                EXECURTE_COMMAND=tfscript_config
+                ;;
+            lint)
+                (( ++COMMAND_LENGTH ))
+                EXECURTE_COMMAND=tflint
+                ;;
+            update)
+                (( ++COMMAND_LENGTH ))
+                EXECURTE_COMMAND=tfupdate
+                ;;
+            sec)
+                (( ++COMMAND_LENGTH ))
+                EXECURTE_COMMAND=tfsec
+                ;;
+            validate | plan | apply | destroy | fmt | import | show | version )
+                (( ++COMMAND_LENGTH ))
+                EXECURTE_COMMAND="terraform"
+                SUB_COMMANDS+=("$1")
+                ;;
+            providers)
+                (( ++COMMAND_LENGTH ))
+                EXECURTE_COMMAND="terraform"
+                SUB_COMMANDS+=("$1")
+                case "$2" in
+                    lock | mirror | schema)
+                        SUB_COMMANDS+=("$2")
+                        shift
+                        ;;
+                esac
+                ;;
+            state)
+                (( ++COMMAND_LENGTH ))
+                EXECURTE_COMMAND="terraform"
+                SUB_COMMANDS+=("$1")
+                case "$2" in
+                    list | mv | pull | push | repalace-provider | rm | show)
+                        SUB_COMMANDS+=("$2")
+                        shift
+                        ;;
+                esac
+                ;;
+            workspace)
+                (( ++COMMAND_LENGTH ))
+                EXECURTE_COMMAND="terraform"
+                SUB_COMMANDS+=("$1")
+                case "$2" in
+                    delete | liset | new | select | show)
+                        SUB_COMMANDS+=("$2")
+                        shift
+                        ;;
+                esac
+                ;;
+            *)
+                SUB_COMMANDS+=("$1")
+                ;;
+        esac
+        shift
+    done
+
+    if [ "$COMMAND_LENGTH" -gt 1 ]; then
+        echo "" >&2
+        echo "ERROR: Too many command line arguments." 1>&2
+        echo "" >&2
+        exit 126
+    fi
+    if [ "$COMMAND_LENGTH" -eq 0 ]; then
+        usage
+    fi
+}
+
+#
+# Check: tfscript.config.yml
+#
+function tfscript_config() {
+
+    if [ -f "${CURRENT_DIRECTORY}/tfscript.config.yml" ]; then
+        yq -r '.' < "${CURRENT_DIRECTORY}/tfscript.config.yml"
+    else
+        echo "" >&2
+        echo "ERROR: There is no config file." >&2
+        echo "" >&2
+        exit 1
+    fi
+}
+
+#
+# Command: tflint
+#
+function execute_tflint() {
+    echo "tfscript:execute_tflint"
+    TF_OPTION=("${OPTS[*]:-}")
+    TF_SUB_COMMANDS=("${SUB_COMMANDS:-}")
+    echo "tfscript:execute_tflint tflint ${TF_SUB_COMMANDS[*]:-} ${TF_OPTION[*]:-}"
+    eval tflint "${TF_SUB_COMMANDS[*]:-} ${TF_OPTION[*]:-}"
+}
+
+#
+# Command: tfupdate
+#
+function execute_tfupdate() {
+    echo "tfscript:execute_tfupdate"
+    TF_OPTION=("${OPTS[*]:-}")
+    TF_SUB_COMMANDS=("${SUB_COMMANDS[*]:-}")
+    echo "tfscript:execute_tfupdate tfupdate ${TF_SUB_COMMANDS[*]:-} ${TF_OPTION[*]:-}"
+    #eval tfupdate "${TF_SUB_COMMANDS[*]:-} ${TF_OPTION[*]:-}"
+    tfupdate terraform .
+}
+
+#
+# Command: tfsec
+#
+function execute_tfsec() {
+    echo "tfscript:execute_tfsec"
+    TF_OPTION=("${OPTS[*]:-}")
+    TF_SUB_COMMANDS=("${SUB_COMMANDS[*]:-}")
+    echo "tfscript:execute_tfsec tfsec ${TF_SUB_COMMANDS[*]:-} ${TF_OPTION[*]:-}"
+    #eval tfsec "${TF_SUB_COMMANDS[*]:-} ${TF_OPTION[*]:-}"
+    tfsec
+}
+
+#
+# Command: terarform
+#
+function execute_terraform() {
+
+    TF_OPTION=("${OPTS[*]:-}")
+    TF_SUB_COMMANDS=("${SUB_COMMANDS[*]:-}")
+    echo "#"
+    echo "# Execute     : terraform ${TF_SUB_COMMANDS[*]:-} ${TF_OPTION[*]:-}"
+    echo "# Plugin Cache: ${TF_PLUGIN_CACHE_DIR:-(none)}"
+    echo "#"
+    echo "# terraform version: $(cat .terraform-version)"
+    eval tfenv install > /dev/null
+    eval "terraform fmt -recursive" > /dev/null
+    echo "# Terraform Configs: ${BACKEND_CONFIGS}"
+    echo "#"
+    echo ""
+    eval terraform init "${BACKEND_CONFIGS}" -backend=true -force-copy -reconfigure
+    eval "terraform ${TF_SUB_COMMANDS[*]:-} ${TF_OPTION[*]:-}"
+}
+
+#
+# Main Function
+#
+function main() {
+
+    echo "#"
+    echo "# Current dir: ${CURRENT_DIRECTORY}"
+    echo "#"
+    echo "# Execute Commands: ${EXECURTE_COMMAND} ${SUB_COMMANDS[*]:-}"
+    echo "# Options         : ${OPTS[*]:-(none)}"
+    echo "#"
+
+    case "$EXECURTE_COMMAND" in
+        tfscript_config)
+            tfscript_config
+            exit 0
+            ;;
+    esac
+
+    #
+    # Check: Target Project Directory
+    #
+    if [ ! "${CH_DIR}" ]; then
+        echo "" >&2
+        echo "ERROR: Target directory is not set." >&2
+        echo ""
+        echo "  Please set -d DIR option to execute ${EXECURTE_COMMAND}" >&2
+        echo "" >&2
+        exit 128
+    fi
+    if [ "$CH_DIR_COUNT" -gt 1 ]; then
+        echo "" >&2
+        echo "ERROR: To many -d options." >&2
+        echo "" >&2
+        exit 128
+    fi
+    if [ ! -d "${CURRENT_DIRECTORY}/${CH_DIR}" ]; then
+        echo "" >&2
+        echo "ERROR: Invalid directory path $CH_DIR" >&2
+        echo "" >&2
+        exit 1
+    fi
+    echo "# Project    : ${CH_DIR}"
+
+    #
+    # Check: Project envs.yml File
+    #
+    if [ ! -f "${CURRENT_DIRECTORY}/${CH_DIR}/envs.yml" ]; then
+        echo "" >&2
+        echo "ERROR: There is no env.yml file in ${CH_DIR}." >&2
+        echo "" >&2
+        exit 1
+    fi
+    if [ "$(yq -r ".environments.${TFS_ENV}" < "${CURRENT_DIRECTORY}/${CH_DIR}/envs.yml")" = "null" ]; then
+        echo "" >&2
+        echo "ERROR: There is no ${TFS_ENV} parameter in ${CURRENT_DIRECTORY}/${CH_DIR}/envs.yml" >&2
+        echo "" >&2
+        exit 1
+    fi
+    BACKEND_CONFIGS=$(yq '.environments.production | 
+        "-backend-config=\"bucket=" + .terraform.backend.bucket + "\" -backend-config=\"key=" + .terraform.backend.key + "\" -backend-config=\"region=" + .terraform.backend.region + "\" -backend-config=\"profile=" + .terraform.backend.profile + "\""' \
+        < "${CURRENT_DIRECTORY}/${CH_DIR}/envs.yml")
+
+    #
+    # Check: Target Project Environment
+    #
+    if [ ! "$TFS_ENV" ]; then
+        echo "" >&2
+        echo "ERROR: Target Project Environment is not set." >&2
+        echo ""
+        echo "  Please set -e ENVRIRONMENT option to execute ${EXECURTE_COMMAND}" >&2
+        echo "" >&2
+        exit 128
+    fi
+    if [ "$TFS_ENV_COUNT" -gt 1 ]; then
+        echo "" >&2
+        echo "ERROR: To many -e options." >&2
+        echo "" >&2
+        exit 128
+    fi
+    if [ ! -d "${CURRENT_DIRECTORY}/${CH_DIR}/environments/${TFS_ENV}" ]; then
+        echo "" >&2
+        echo "ERROR: Invalid directory path." >&2
+        echo "" >&2
+        echo "  There is no directory named ${CH_DIR}/environments/${TFS_ENV}" >&2
+        echo "" >&2
+        exit 1
+    fi
+    echo "# Environment: ${TFS_ENV}"
+
+    #
+    # Check: Target Project's Layer
+    #
+    for dir in ${TFS_LAYER[@]+"${TFS_LAYER[@]}"}
+    do
+        if [ ! -d "${CURRENT_DIRECTORY}/${CH_DIR}/environments/${TFS_ENV}/${dir}" ]; then
+            echo "" >&2
+            echo "ERROR: Invalid Layer Name." >&2
+            echo "" >&2
+            echo "  $dir is wrong name." >&2
+            echo "" >&2
+            exit 1
+        fi
+    done
+    if [ $TFS_LAYER_ALL_FLG -ne 0 ]; then
+        TFS_LAYER=($(ls "${CURRENT_DIRECTORY}/${CH_DIR}/environments/${TFS_ENV}/"))
+    fi
+    echo "# Layers     : ${TFS_LAYER[*]:-(none)}"
+    if [ "${TFS_LAYER[*]:-(none)}" = '(none)' ]; then
+        echo "" >&2
+        echo "ERROR: Lack of layer target."
+        echo "" >&2
+        echo "  You must to set -l <layer name> or -al ."
+        echo "" >&2
+        exit 128
+    fi
+
+    #
+    # Core Procedure
+    #
+    set +e
+    for dir in ${TFS_LAYER[@]+"${TFS_LAYER[@]}"}
+    do
+        cd "${CURRENT_DIRECTORY}/${CH_DIR}/environments/${TFS_ENV}/${dir}"
+
+        case "$EXECURTE_COMMAND" in
+            tfscript_diff)
+                tfscript_diff
+                ;;
+            tflint)
+                execute_tflint
+                ;;
+            tfupdate)
+                execute_tfupdate
+                ;;
+            tfsec)
+                execute_tfsec
+                ;;
+            terraform)
+                execute_terraform
+                ;;
+            *)
+                echo "" >&2
+                echo "ERROR: There is no tfscript ${SUB_COMMANDS:-(none)}." >&2
+                echo "" >&2
+                usage
+                ;;
+        esac
+
+        cd "${CURRENT_DIRECTORY}"
+    done
+    set -e
+
+}
+
+#
+# Entrypoint
+#
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    scan_commands
+    parse_args "$@"
+    main
+
+    exit 0
+fi

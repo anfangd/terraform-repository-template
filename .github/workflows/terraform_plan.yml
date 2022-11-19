@@ -61,7 +61,7 @@ jobs:
       web-sites_files: ${{ steps.filter.outputs.web-sites_files }}
     steps:
       - name: checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: filter
         id: filter
@@ -85,9 +85,12 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.platforms == 'true' }}
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        project: [ core-resource, monitoring, platform_3_jc ]
     steps:
       - name: checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: echo hi
         run: echo "do platforms job"
@@ -101,7 +104,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - run: echo "do infrastructures job"
 
@@ -114,7 +117,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - run: echo "do services job"
 
@@ -127,7 +130,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - run: echo "do web-sites job"
 

@@ -1,0 +1,10 @@
+{
+  "inputs": {
+    "env_name": "production",
+    "codeBuildProjectName": "TestProjectName",
+    "roleToAssume": "TestRole",
+    "changed": "[\"src/terraform/platforms/platform_3_jc/environments/production/setup/main.tf\"]",
+    "project_root_dir": "src/terraform/platforms/platform_3_jc",
+    "env_root_dir": "src/terraform/platforms/platform_3_jc/environments/production"
+  }
+}

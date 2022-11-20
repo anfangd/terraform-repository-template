@@ -1,0 +1,102 @@
+name: Run CodeBuild
+run-name: ${{ github.actor }} kick AWS CodeBuild / ${{ github.event.inputs.code_build_project_name }}
+
+on:
+  workflow_call:
+    inputs:
+      env_name:
+        required: true
+        type: string
+      code_build_project_name:
+        required: true
+        type: string
+      role_to_assume:
+        required: true
+        type: string
+      changed:
+        required: true
+        type: string
+      project_root_dir:
+        required: true
+        type: string
+      env_root_dir:
+        required: true
+        type: string
+
+jobs:
+  run-code-build:
+    runs-on: ubuntu-20.04
+    env:
+      inputs_env_name: ${{ github.event.inputs.env_name }}
+      inputs_code_build_project_name: ${{ github.event.inputs.code_build_project_name }}
+      inputs_role_to_assume: ${{ github.event.inputs.rolr_to_assume }}
+      inputs_changed: ${{ github.event.inputs.changed }}
+      inputs_project_root_dir: ${{ github.event.inputs.project_root_dir }}
+      inputs_env_root_dir: ${{ github.event.inputs.env_root_dir }}
+    steps:
+      - name: DEBUG Echo values
+        run: |
+          echo "Echo Values"
+          echo "  - Environment Name:" ${{ env.inputs_env_name }}
+          echo "  - Changed Files   :" ${{ env.inputs_changed }}
+          echo "  - Project Root Dir:" ${{ env.inputs_project_root_dir }}
+          echo "  - Env Root Dir    :" ${{ env.inputs_env_root_dir }}
+
+      - name: Extract
+        id: extract
+        run: |
+          echo count=$(echo ${{  toJSON(env.inputs_changed) }} | jq ' .[] | select( startswith( "${{ env.inputs_env_root_dir }}" ) )' | wc -l) >> $GITHUB_ENV
+          echo envs_yml=$(echo ${{ toJSON(env.inputs_changed) }} | jq ' .[] | select( startswith( "${{ env.inputs_project_root_dir }}/envs.yml" ) )' | wc -l) >> $GITHUB_ENV
+          echo layers=$(echo ${{ toJSON(env.inputs_changed) }} | jq -r ' .[] | select( startswith( "${{ env.inputs_env_root_dir }}" ) )' | sed -e 's|${{ env.inputs_env_root_dir }}/||g' | cut -d / -f 1 | uniq ) >> $GITHUB_ENV
+          echo DEBUG ${{ env.inputs_changed }}
+
+      - name: DEBUG No Target Layer
+        if: ${{ env.count == 0 && env.envs_yml == 0 }}
+        run: |
+          echo Count: ${{ env.count }}. No Target Layer.
+
+      - name: DEBUG Specific Target Layers
+        if: ${{ env.count != 0 && env.envs_yml == 0 }}
+        run: |
+          echo Count: ${{ env.count }}. Specific Target Layers.
+          echo Layers: ${{ env.layers }}
+      
+      - name: DEBUG All Layers
+        if: ${{ env.envs_yml != 0 }}
+        run: |
+          echo Count: ${{ env.count }}. All Layers.
+
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        fetch-depth: 0
+
+      - name: Configure AWS credentials
+        if: ${{ env.count != 0 || env.envs_yml != 0 }}
+        run: |
+          echo DEBUG Configure AWS credentials
+          echo RoleToAssume: ${{ env.role_to_assume }}
+      #   uses: aws-actions/configure-aws-credentials@v1
+      #   with:
+      #     role-to-assume: ${{ env.role_to_assume }}
+      #     aws-region: ap-northeast-1
+      #     role-duration-seconds: 3600
+
+      - name: Run CodeBuild
+        if: ${{ env.count != 0 || env.envs_yml != 0 }}
+        run: |
+          echo DEBUG Run CodeBuild
+          echo CodeBuild Project Name: ${{ env.code_build_project_name }}
+          echo Env: ${{ env.inputs_env_name }}
+          echo Layers: ${{ env.layers }}
+          echo All Layer: ${{ env.envs_yml}}
+      #   uses: aws-actions/aws-codebuild-run-build@v1
+      #   with:
+      #     project-name: ${{ env.code_build_project_name }}
+      #   env-vars-for-codebuild: |
+      #     custom,
+      #     requester,
+      #     event-name
+      #   env:
+      #     custom: my environment variable
+      #     requester: ${{ github.actor }}
+      #     event-name: ${{ github.event_name }}

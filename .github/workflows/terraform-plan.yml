@@ -1,12 +1,12 @@
 name: Terraform Plan
-run-name: ${{ github.actor }} kick {{ github.workflow }} 🚀
+run-name: ${{ github.actor }} kick ${{ github.workflow }} 🚀
 
 on: 
   workflow_dispatch:
   pull_request:
     branches:
       - main
-    types: [opened, synchronize, closed]
+    # types: [opened, synchronize, closed]
     paths:
       - 'src/terraform/platforms/*'
       - 'src/terraofrm/infrastructures/*'

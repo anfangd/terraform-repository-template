@@ -45,14 +45,17 @@ jobs:
           echo "github.workflow ${{github.workflow}}" # string  ワークフローの名前。 ワークフローファイルで name を指定していない場合、このプロパティの値は、リポジトリ内にあるワークフローファイルのフルパスになります。
           echo "github.workspace ${{github.workspace}}" # string    checkoutアクションを使う際の、ステップにとってのデフォルトのワーキングディレクトリであり、リポジトリのデフォルトの場所です。
 
-
   changes:
     name: Changes
     runs-on: ubuntu-20.04
     needs: test
     outputs:
-      platforms: ${{ steps.filter.outputs.platforms }}
-      platforms_files: ${{ steps.filter.outputs.platforms_files }}
+      platforms_code-resource: ${{ steps.filter.outputs.platforms_code-resource }}
+      platforms_code-resource_files: ${{ steps.filter.outputs.platforms_code-resource_files }}
+      platforms_monitoring: ${{ steps.filter.outputs.platforms_monitoring }}
+      platforms_monitoring_files: ${{ steps.filter.outputs.platforms_monitoring_files }}
+      platforms_platform_3_jc: ${{ steps.filter.outputs.platforms_platform_3_jc }}
+      platforms_platform_3_jc_files: ${{ steps.filter.outputs.platforms_platform_3_jc_files }}
       infrastructures: ${{ steps.filter.outputs.infrastructures }}
       infrastructures_files: ${{ steps.filter.outputs.infrastructures_files }}
       services: ${{ steps.filter.outputs.services }}
@@ -69,8 +72,12 @@ jobs:
         with:
           list-files: json
           filters: |
-            platforms:
-              - 'src/terraform/platforms/**'
+            platforms_code-resource:
+              - 'src/terraform/platforms/code-resource/**'
+            platforms_monitoring:
+              - 'src/terraform/platforms/monitoring/**'
+            platforms_platform_3_jc:
+              - 'src/terraform/platforms/platform_3_jc/**'
             infrastructures:
               - 'src/terraofrm/infrastructures/**'
             services:
@@ -79,34 +86,134 @@ jobs:
               - 'src/terraform/web-site/**'
 
       - name: changed
-        run: echo "aaa" ${{ steps.filter.outputs.platforms_files }}
+        run: echo "aaa" ${{ steps.filter.outputs.platforms_core-resource_files }}
 
-  platforms:
+  platforms_code-resource:
     needs: changes
-    if: ${{ needs.changes.outputs.platforms == 'true' }}
+    if: ${{ needs.changes.outputs.platforms_code-resource == 'true' }}
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        project: [ core-resource, monitoring, platform_3_jc ]
+        env_name: [ production ]
+    env:
+      changed: ${{ toJSON(needs.changes.outputs.platforms_code-resource_files) }}
+      project_root_dir: src/terraform/platforms/code-resource
+      env_root_dir: src/terraform/platforms/code-resource/environments/${{ matrix.env_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: echo values
+        run: |
+          echo "Echo Values"
+          echo "  - Environment Name:" ${{ matrix.env_name }}
+          echo "  - Changed Files   :" ${{ env.changed }}
+          echo "  - Project Root Dir:" ${{ env.project_root_dir }}
+          echo "  - Env Root Dir    :" ${{ env.env_root_dir }}
+
+      - name: Extract
+        id: select
+        run: |
+          echo count=$(echo ${{ env.changed }} | jq ' .[] | select( startswith( "${{ env.env_root_dir }}" ) )' | wc -l) >> $GITHUB_ENV
+          echo envs_yml=$(echo ${{ env.changed }} | jq ' .[] | select( startswith( "${{ env.project_root_dir }}/envs.yml" ) )' | wc -l) >> $GITHUB_ENV
+          echo layers=$(echo ${{ env.changed }} | jq -r ' .[] | select( startswith( "${{ env.env_root_dir }}" ) )' | sed -e 's|${{ env.env_root_dir }}/||g' ) >> $GITHUB_ENV
+          echo layer name: $(echo ${{ env.changed }} | jq -r ' .[] | select( startswith( "${{ env.env_root_dir }}" ) )' | sed -e 's|${{ env.env_root_dir }}/||g' | cut -d / -f 1 )
+
+
+        # 最初の / で区切って、それより前も Layer として取得する
+
+      - name: No Target Layer
+        if: ${{ env.count == 0 && env.envs_yml == 0 }}
+        run: |
+          echo Count: ${{ env.count }}. No Target Layer.
+
+      - name: Specific Target Layers
+        if: ${{ env.count != 0 && env.envs_yml == 0 }}
+        run: |
+          echo Count: ${{ env.count }}. Specific Target Layers.
+          echo Layers: ${{ env.layers }}
+      
+      - name: All Layers
+        if: ${{ env.envs_yml != 0 }}
+        run: |
+          echo Count: ${{ env.count }}. All Layers.
+
+      # 対象の環境が何か確認する
+      # - 対象が存在しない場合は envs.yml が変更がったときだけ全部を実行したい。
+      # - 対象の環境が存在する場合は、変更があった layer まで特定したい。　←こっちがメイン
+
+  platforms_code-resource_production:
+    needs: platforms_code-resource
+    #if:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: hello
+        run: echo hello
+      # Checkout
+      # AWS Assume Role
+      # Run CodeBuild
+
+  platforms_monitoring:
+    needs: changes
+    if: ${{ needs.changes.outputs.platforms_monitoring == 'true' }}
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        env_name: [ production ]
     steps:
       - name: checkout
         uses: actions/checkout@v3
 
       - name: echo hi
-        run: echo "do platforms job"
+        run: echo "do platforms job" ${{ matrix.env_name }}
 
       - name: changeds files
-        run: echo "this is changed files:" ${{ needs.changes.outputs.platforms_files }}
+        run: echo "this is changed files:" ${{ needs.changes.outputs.platforms_monitoring_files }}
+
+      # 対象の環境が何か確認する
+      # - 対象が存在しない場合は envs.yml が変更がったときだけ全部を実行したい。
+      # - 対象の環境が存在する場合は、変更があった layer まで特定したい。　←こっちがメイン
+
+  platforms_monitoring_production:
+    needs: platforms_monitoring
+    #if:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: hello
+        run: echo hello
+      # Checkout
+      # AWS Assume Role
+      # Run CodeBuild
+
+  platforms_platform_3_jc:
+    needs: changes
+    if: ${{ needs.changes.outputs.platforms_platform_3_jc == 'true' }}
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        env_name: [ production, pre-production, development ]
+    steps:
+      - name: checkout
+        uses: actions/checkout@v3
+
+      - name: echo hi
+        run: echo "do platforms job" ${{ matrix.env_name }}
+
+      - name: changeds files
+        run: echo "this is changed files:" ${{ needs.changes.outputs.platforms_platform_3_jc_files }}
 
   infrastructures:
     needs: changes
     if: ${{ needs.changes.outputs.infrastructures == 'true' }}
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        env_name: [ production ]
     steps:
       - name: checkout
         uses: actions/checkout@v3
 
-      - run: echo "do infrastructures job"
+      - run: echo "do infrastructures job" ${{ matrix.env_name }}
 
       - name: changeds files
         run: echo "this is changed files:" ${{ needs.changes.outputs.infrastructures_files }}

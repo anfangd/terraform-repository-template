@@ -8,10 +8,10 @@ on:
       - main
     # types: [opened, synchronize, closed]
     paths:
-      - 'src/terraform/platforms/*'
-      - 'src/terraofrm/infrastructures/*'
-      - 'src/terraform/services/*'
-      - 'src/terraform/web-site/*'
+      - 'src/terraform/platforms/**'
+      - 'src/terraofrm/infrastructures/**'
+      - 'src/terraform/services/**'
+      - 'src/terraform/web-site/**'
 
 permissions:
   pull-requests: read

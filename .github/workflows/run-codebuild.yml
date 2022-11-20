@@ -1,5 +1,5 @@
 name: Run CodeBuild
-run-name: ${{ github.actor }} kick AWS CodeBuild / ${{ github.event.inputs.code_build_project_name }}
+run-name: ${{ github.actor }} kick AWS CodeBuild 🚀 ${{ github.event.inputs.code_build_project_name }}
 
 on:
   workflow_call:

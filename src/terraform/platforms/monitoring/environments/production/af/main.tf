@@ -1,4 +1,3 @@
-
 # Indexes & Archive
 
 ## - TrailLog

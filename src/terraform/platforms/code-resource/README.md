@@ -7,4 +7,3 @@
 システム構成
 
 ![](./docs/img/architecture.drawio.svg)
-

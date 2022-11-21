@@ -1,5 +1,5 @@
-name: Run CodeBuild
-run-name: ${{ github.actor }} kick AWS CodeBuild 🚀 ${{ github.event.inputs.code_build_project_name }}
+name: Run CodeBuild | Terraform CI/CD
+run-name: ${{ github.actor }} kicked AWS CodeBuild | Terraform CI/CD 🚀 ${{ github.event.inputs.code_build_project_name }}
 
 on:
   workflow_call:
@@ -42,7 +42,7 @@ jobs:
           echo "  - Project Root Dir:" ${{ env.inputs_project_root_dir }}
           echo "  - Env Root Dir    :" ${{ env.inputs_env_root_dir }}
 
-      - name: Extract
+      - name: Extract Target Layers
         id: extract
         run: |
           echo count=$(echo ${{  toJSON(env.inputs_changed) }} | jq ' .[] | select( startswith( "${{ env.inputs_env_root_dir }}" ) )' | wc -l) >> $GITHUB_ENV

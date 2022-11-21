@@ -1,12 +1,11 @@
-name: Terraform Plan
-run-name: ${{ github.actor }} kick ${{ github.workflow }} 🚀
+name: Terraform CI
+run-name: ${{ github.actor }} kicked ${{ github.workflow }} 🚀 ${{ github.event.pull_request_title }}
 
 on: 
   workflow_dispatch:
   pull_request:
     branches:
       - main
-    # types: [opened, synchronize, closed]
     paths:
       - 'src/terraform/platforms/**'
       - 'src/terraofrm/infrastructures/**'
@@ -18,7 +17,7 @@ permissions:
 
 jobs:
   test:
-    name: Test
+    name: Test GitHub Actions
     runs-on: ubuntu-20.04
     steps:
       - name: Verify Github Contexts
@@ -60,12 +59,12 @@ jobs:
       web-sites: ${{ steps.filter.outputs.web-sites }}
       web-sites_files: ${{ steps.filter.outputs.web-sites_files }}
     steps:
-      - name: checkout
+      - name: Checkout Repository
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
-      - name: filter
+      - name: Filter Changes
         id: filter
         uses: dorny/paths-filter@v2
         with:
@@ -84,10 +83,8 @@ jobs:
             web-sites:
               - 'src/terraform/web-site/**'
 
-      - name: changed
-        run: echo "aaa" ${{ steps.filter.outputs.platforms_core-resource_files }}
-
   platforms_code-resource:
+    name: Platforms / Code Resource
     needs: changes
     if: ${{ needs.changes.outputs.platforms_code-resource == 'true' }}
     runs-on: ubuntu-20.04
@@ -125,6 +122,7 @@ jobs:
           echo "DEBUG   - Env Root Dir    : ${{ env.env_root_dir }}"
 
   platforms_monitoring:
+    name: Platforms / Monitoring
     needs: changes
     if: ${{ needs.changes.outputs.platforms_monitoring == 'true' }}
     runs-on: ubuntu-20.04
@@ -162,6 +160,7 @@ jobs:
           echo "DEBUG   - Env Root Dir    : ${{ env.env_root_dir }}"
 
   platforms_platform_3_jc:
+    name: Platfomrs / Platform 3 JC [ ${{ matrix.env_name }} ]
     needs: changes
     if: ${{ needs.changes.outputs.platforms_platform_3_jc == 'true' }}
     runs-on: ubuntu-20.04
@@ -199,6 +198,7 @@ jobs:
           echo "DEBUG   - Env Root Dir    : ${{ env.env_root_dir }}"
 
   infrastructures:
+    name: Infrastructures
     needs: changes
     if: ${{ needs.changes.outputs.infrastructures == 'true' }}
     runs-on: ubuntu-20.04
@@ -236,6 +236,7 @@ jobs:
           echo "DEBUG   - Env Root Dir    : ${{ env.env_root_dir }}"
 
   services:
+    name: Services
     needs: changes
     if: ${{ needs.changes.outputs.services == 'true' }}
     runs-on: ubuntu-20.04
@@ -273,6 +274,7 @@ jobs:
           echo "DEBUG   - Env Root Dir    : ${{ env.env_root_dir }}"
 
   web-sites:
+    name: Web Sites
     needs: changes
     if: ${{ needs.changes.outputs.web-sites == 'true' }}
     runs-on: ubuntu-20.04

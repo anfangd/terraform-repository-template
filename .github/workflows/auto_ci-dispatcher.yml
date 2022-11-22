@@ -108,7 +108,8 @@ jobs:
     #   project_root_dir: src/terraform/platforms/code-resource
     #   env_root_dir: src/terraform/platforms/code-resource/environments/${{ matrix.env_name }}
     env:
-      code_build_project_name: TestBuildProject
+      production: arn:aws:iam::xxxxxxxxxxxx:role/xxxxxxxxx
+      code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
       role_to_assume: ${{ env[ matrix.env_name ]}}
       changed: ${{ toJSON(needs.changes.outputs.platforms_code-resource) }}
       project_root_dir: src/terraform/platforms/code-resource

@@ -60,7 +60,7 @@ OPTIONS
         Layer Name
 
 EXAMPLE
-        tfscript plan -t platforms/code-resource -e production -l setup
+        tfscript plan -d platforms/code-resource -e production -l setup
 ```
 
 ## Execute Process Flow

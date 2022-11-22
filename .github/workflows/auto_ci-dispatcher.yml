@@ -1,24 +1,31 @@
-name: Terraform Plan
-run-name: ${{ github.actor }} kick ${{ github.workflow }} 🚀
+#
+# Pull Request が作成された時に起動する Dispather Workflow
+# 変更差分を確認し、 terraform plan が必要なプロダクトを判定してCIを実行する
+#
+# 環境とレイヤーの判定は Auto Run CodeBuild 側で実施する
+#
+name: Pull Request CI Dispatcher
+run-name: ${{ github.actor }} kicked ${{ github.workflow }} 🚀 ${{ github.event.pull_request_title }}
 
 on: 
-  workflow_dispatch:
   pull_request:
     branches:
       - main
-    # types: [opened, synchronize, closed]
     paths:
-      - 'src/terraform/platforms/*'
-      - 'src/terraofrm/infrastructures/*'
-      - 'src/terraform/services/*'
-      - 'src/terraform/web-site/*'
+      - 'src/terraform/platforms/**'
+      - 'src/terraofrm/infrastructures/**'
+      - 'src/terraform/services/**'
+      - 'src/terraform/web-site/**'
+
+env:
+  CODE_BUILD_PROJECT: "TerraformCI"
 
 permissions:
   pull-requests: read
 
 jobs:
   test:
-    name: Test
+    name: Test GitHub Actions
     runs-on: ubuntu-20.04
     steps:
       - name: Verify Github Contexts
@@ -44,7 +51,7 @@ jobs:
           echo "github.workspace ${{github.workspace}}" # string    checkoutアクションを使う際の、ステップにとってのデフォルトのワーキングディレクトリであり、リポジトリのデフォルトの場所です。
 
   changes:
-    name: Changes
+    name: Filter Changes
     runs-on: ubuntu-20.04
     outputs:
       platforms_code-resource: ${{ steps.filter.outputs.platforms_code-resource }}
@@ -60,12 +67,12 @@ jobs:
       web-sites: ${{ steps.filter.outputs.web-sites }}
       web-sites_files: ${{ steps.filter.outputs.web-sites_files }}
     steps:
-      - name: checkout
+      - name: Checkout Repository
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
-      - name: filter
+      - name: Filter Changes
         id: filter
         uses: dorny/paths-filter@v2
         with:
@@ -84,10 +91,8 @@ jobs:
             web-sites:
               - 'src/terraform/web-site/**'
 
-      - name: changed
-        run: echo "aaa" ${{ steps.filter.outputs.platforms_core-resource_files }}
-
   platforms_code-resource:
+    name: Platforms / Code Resource
     needs: changes
     if: ${{ needs.changes.outputs.platforms_code-resource == 'true' }}
     runs-on: ubuntu-20.04
@@ -97,23 +102,19 @@ jobs:
     # uses: ./.github/workflows/run-codebuild.yml@main
     # with:
     #   env_name: ${{ matrix.env_name }}
-    #   code_build_project_name: TestBuildProject
-    #   role_to_assume: TestRole
+    #   code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
+    #   role_to_assume: ${{ env[ matrix.env_name ]}}
     #   changed: ${{ toJSON(needs.changes.outputs.platforms_code-resource) }}
     #   project_root_dir: src/terraform/platforms/code-resource
     #   env_root_dir: src/terraform/platforms/code-resource/environments/${{ matrix.env_name }}
     env:
-      code_build_project_name: TestBuildProject
-      role_to_assume: TestRole
+      production: arn:aws:iam::xxxxxxxxxxxx:role/xxxxxxxxx
+      # code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
+      # role_to_assume: ${{ env[ matrix.env_name ]}}
       changed: ${{ toJSON(needs.changes.outputs.platforms_code-resource) }}
       project_root_dir: src/terraform/platforms/code-resource
       env_root_dir: src/terraform/platforms/code-resource/environments/${{ matrix.env_name }}
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
       - name: Echo Values
         run: |
           echo "DEBUG Echo Values"
@@ -125,6 +126,7 @@ jobs:
           echo "DEBUG   - Env Root Dir    : ${{ env.env_root_dir }}"
 
   platforms_monitoring:
+    name: Platforms / Monitoring
     needs: changes
     if: ${{ needs.changes.outputs.platforms_monitoring == 'true' }}
     runs-on: ubuntu-20.04
@@ -134,23 +136,19 @@ jobs:
     # uses: ./.github/workflows/run-codebuild.yml@main
     # with:
     #   env_name: ${{ matrix.env_name }}
-    #   code_build_project_name: TestBuildProject
-    #   role_to_assume: TestRole
+    #   code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
+    #   role_to_assume: ${{ env[ matrix.env_name ]}}
     #   changed: ${{ toJSON(needs.changes.outputs.platforms_monitoringe) }}
     #   project_root_dir: src/terraform/platforms/monitoring
     #   env_root_dir: src/terraform/platforms/monitoring/environments/${{ matrix.env_name }}
     env:
-      code_build_project_name: TestBuildProject
-      role_to_assume: TestRole
+      production: arn:aws:iam::xxxxxxxxxxxx:role/xxxxxxxxx
+      # code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
+      # role_to_assume: ${{ env[ matrix.env_name ]}}
       changed: ${{ toJSON(needs.changes.outputs.platforms_monitoring) }}
       project_root_dir: src/terraform/platforms/monitoring
       env_root_dir: src/terraform/platforms/monitoring/environments/${{ matrix.env_name }}
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
       - name: Echo Values
         run: |
           echo "DEBUG Echo Values"
@@ -162,6 +160,7 @@ jobs:
           echo "DEBUG   - Env Root Dir    : ${{ env.env_root_dir }}"
 
   platforms_platform_3_jc:
+    name: Platfomrs / Platform 3 JC
     needs: changes
     if: ${{ needs.changes.outputs.platforms_platform_3_jc == 'true' }}
     runs-on: ubuntu-20.04
@@ -171,23 +170,19 @@ jobs:
     # uses: ./.github/workflows/run-codebuild.yml@main
     # with:
     #   env_name: ${{ matrix.env_name }}
-    #   code_build_project_name: TestBuildProject
-    #   role_to_assume: TestRole
+    #   code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
+    #   role_to_assume: ${{ env[ matrix.env_name ]}}
     #   changed: ${{ toJSON(needs.changes.outputs.platforms_platform_3_jc_files) }}
     #   project_root_dir: src/terraform/platforms/platform_3_jc
     #   env_root_dir: src/terraform/platforms/platform_3_jc/environments/${{ matrix.env_name }}
     env:
-      code_build_project_name: TestBuildProject
-      role_to_assume: TestRole
+      production: arn:aws:iam::xxxxxxxxxxxx:role/xxxxxxxxx
+      # code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
+      # role_to_assume: ${{ env[ matrix.env_name ]}}
       changed: ${{ toJSON(needs.changes.outputs.platforms_platform_3_jc_files) }}
       project_root_dir: src/terraform/platforms/platform_3_jc
       env_root_dir: src/terraform/platforms/platform_3_jc/environments/${{ matrix.env_name }}
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
       - name: Echo Values
         run: |
           echo "DEBUG Echo Values"
@@ -199,6 +194,7 @@ jobs:
           echo "DEBUG   - Env Root Dir    : ${{ env.env_root_dir }}"
 
   infrastructures:
+    name: Infrastructures
     needs: changes
     if: ${{ needs.changes.outputs.infrastructures == 'true' }}
     runs-on: ubuntu-20.04
@@ -208,23 +204,19 @@ jobs:
     # uses: ./.github/workflows/run-codebuild.yml@main
     # with:
     #   env_name: ${{ matrix.env_name }}
-    #   code_build_project_name: TestBuildProject
-    #   role_to_assume: TestRole
+    #   code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
+    #   role_to_assume: ${{ env[ matrix.env_name ]}}
     #   changed: ${{ toJSON(needs.changes.outputs.infrastructures) }}
     #   project_root_dir: src/terraform/infrastructures/infrastructures_1_di
     #   env_root_dir: src/terraform/infrastructures/infrastructures_1_di/environments/${{ matrix.env_name }}
     env:
-      code_build_project_name: TestBuildProject
-      role_to_assume: TestRole
+      production: arn:aws:iam::xxxxxxxxxxxx:role/xxxxxxxxx
+      # code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
+      # role_to_assume: ${{ env[ matrix.env_name ]}}
       changed: ${{ toJSON(needs.changes.outputs.infrastructures) }}
       project_root_dir: src/terraform/infrastructures/infrastructures_1_di
       env_root_dir: src/terraform/infrastructures/infrastructures_1_di/environments/${{ matrix.env_name }}
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
       - name: Echo Values
         run: |
           echo "DEBUG Echo Values"
@@ -236,6 +228,7 @@ jobs:
           echo "DEBUG   - Env Root Dir    : ${{ env.env_root_dir }}"
 
   services:
+    name: Services
     needs: changes
     if: ${{ needs.changes.outputs.services == 'true' }}
     runs-on: ubuntu-20.04
@@ -245,23 +238,19 @@ jobs:
     # uses: ./.github/workflows/run-codebuild.yml@main
     # with:
     #   env_name: ${{ matrix.env_name }}
-    #   code_build_project_name: TestBuildProject
-    #   role_to_assume: TestRole
+    #   code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
+    #   role_to_assume: ${{ env[ matrix.env_name ]}}
     #   changed: ${{ toJSON(needs.changes.outputs.services) }}
     #   project_root_dir: src/terraform/services/Service_A
     #   env_root_dir: src/terraform/services/Service_A/environments/${{ matrix.env_name }}
     env:
-      code_build_project_name: TestBuildProject
-      role_to_assume: TestRole
+      production: arn:aws:iam::xxxxxxxxxxxx:role/xxxxxxxxx
+      # code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
+      # role_to_assume: ${{ env[ matrix.env_name ]}}
       changed: ${{ toJSON(needs.changes.outputs.services) }}
       project_root_dir: src/terraform/services/Service_A
       env_root_dir: src/terraform/services/Service_A/environments/${{ matrix.env_name }}
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
       - name: Echo Values
         run: |
           echo "DEBUG Echo Values"
@@ -273,6 +262,7 @@ jobs:
           echo "DEBUG   - Env Root Dir    : ${{ env.env_root_dir }}"
 
   web-sites:
+    name: Web Sites
     needs: changes
     if: ${{ needs.changes.outputs.web-sites == 'true' }}
     runs-on: ubuntu-20.04
@@ -282,23 +272,19 @@ jobs:
     # uses: ./.github/workflows/run-codebuild.yml@main
     # with:
     #   env_name: ${{ matrix.env_name }}
-    #   code_build_project_name: TestBuildProject
-    #   role_to_assume: TestRole
+    #   code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
+    #   role_to_assume: ${{ env[ matrix.env_name ]}}
     #   changed: ${{ toJSON(needs.changes.outputs.web-sites) }}
     #   project_root_dir: src/terraform/web-sites/site-a
     #   env_root_dir: src/terraform/web-sites/site-a/environments/${{ matrix.env_name }}
     env:
-      code_build_project_name: TestBuildProject
-      role_to_assume: TestRole
+      production: arn:aws:iam::xxxxxxxxxxxx:role/xxxxxxxxx
+      # code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
+      # role_to_assume: ${{ env[ matrix.env_name ]}}
       changed: ${{ toJSON(needs.changes.outputs.web-sites) }}
       project_root_dir: src/terraform/web-sites/site-a
       env_root_dir: src/terraform/web-sites/site-a/environments/${{ matrix.env_name }}
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
       - name: Echo Values
         run: |
           echo "DEBUG Echo Values"

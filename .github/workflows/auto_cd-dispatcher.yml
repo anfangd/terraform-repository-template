@@ -1,8 +1,10 @@
 #
 # main ブランチへの push が実行された時に起動する Dispather Workflow
-# 変更差分を確認し、 terraform apply が必要なプロダクト/環境を判定してCIを実行する
+# 変更差分を確認し、 terraform apply が必要なプロダクトを判定してCIを実行する
 #
-name: Merge Branch CD Dispatcher
+# 環境とレイヤーの判定は Auto Run CodeBuild 側で実施する
+#
+name: Auto CD Dispatcher
 run-name: ${{ github.actor }} kicked ${{ github.workflow }} 🚀 ${{ github.event.pull_request_title }}
 
 on: 
@@ -106,8 +108,9 @@ jobs:
     #   project_root_dir: src/terraform/platforms/code-resource
     #   env_root_dir: src/terraform/platforms/code-resource/environments/${{ matrix.env_name }}
     env:
-      code_build_project_name: TestBuildProject
-      role_to_assume: ${{ env[ matrix.env_name ]}}
+      production: arn:aws:iam::xxxxxxxxxxxx:role/xxxxxxxxx
+      # code_build_project_name: TestBuildProject
+      # role_to_assume: ${{ env[ matrix.env_name ]}}
       changed: ${{ toJSON(needs.changes.outputs.platforms_code-resource) }}
       project_root_dir: src/terraform/platforms/code-resource
       env_root_dir: src/terraform/platforms/code-resource/environments/${{ matrix.env_name }}
@@ -140,8 +143,8 @@ jobs:
     #   env_root_dir: src/terraform/platforms/monitoring/environments/${{ matrix.env_name }}
     env:
       production: arn:aws:iam::xxxxxxxxxxxx:role/xxxxxxxxx
-      code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
-      role_to_assume: ${{ env[ matrix.env_name ]}}
+      # code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
+      # role_to_assume: ${{ env[ matrix.env_name ]}}
       changed: ${{ toJSON(needs.changes.outputs.platforms_monitoring) }}
       project_root_dir: src/terraform/platforms/monitoring
       env_root_dir: src/terraform/platforms/monitoring/environments/${{ matrix.env_name }}
@@ -174,8 +177,8 @@ jobs:
     #   env_root_dir: src/terraform/platforms/platform_3_jc/environments/${{ matrix.env_name }}
     env:
       production: arn:aws:iam::xxxxxxxxxxxx:role/xxxxxxxxx
-      code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
-      role_to_assume: ${{ env[ matrix.env_name ]}}
+      # code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
+      # role_to_assume: ${{ env[ matrix.env_name ]}}
       changed: ${{ toJSON(needs.changes.outputs.platforms_platform_3_jc_files) }}
       project_root_dir: src/terraform/platforms/platform_3_jc
       env_root_dir: src/terraform/platforms/platform_3_jc/environments/${{ matrix.env_name }}
@@ -208,8 +211,8 @@ jobs:
     #   env_root_dir: src/terraform/infrastructures/infrastructures_1_di/environments/${{ matrix.env_name }}
     env:
       production: arn:aws:iam::xxxxxxxxxxxx:role/xxxxxxxxx
-      code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
-      role_to_assume: ${{ env[ matrix.env_name ]}}
+      # code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
+      # role_to_assume: ${{ env[ matrix.env_name ]}}
       changed: ${{ toJSON(needs.changes.outputs.infrastructures) }}
       project_root_dir: src/terraform/infrastructures/infrastructures_1_di
       env_root_dir: src/terraform/infrastructures/infrastructures_1_di/environments/${{ matrix.env_name }}
@@ -242,8 +245,8 @@ jobs:
     #   env_root_dir: src/terraform/services/Service_A/environments/${{ matrix.env_name }}
     env:
       production: arn:aws:iam::xxxxxxxxxxxx:role/xxxxxxxxx
-      code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
-      role_to_assume: ${{ env[ matrix.env_name ]}}
+      # code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
+      # role_to_assume: ${{ env[ matrix.env_name ]}}
       changed: ${{ toJSON(needs.changes.outputs.services) }}
       project_root_dir: src/terraform/services/Service_A
       env_root_dir: src/terraform/services/Service_A/environments/${{ matrix.env_name }}
@@ -276,8 +279,8 @@ jobs:
     #   env_root_dir: src/terraform/web-sites/site-a/environments/${{ matrix.env_name }}
     env:
       production: arn:aws:iam::xxxxxxxxxxxx:role/xxxxxxxxx
-      code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
-      role_to_assume: ${{ env[ matrix.env_name ]}}
+      # code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
+      # role_to_assume: ${{ env[ matrix.env_name ]}}
       changed: ${{ toJSON(needs.changes.outputs.web-sites) }}
       project_root_dir: src/terraform/web-sites/site-a
       env_root_dir: src/terraform/web-sites/site-a/environments/${{ matrix.env_name }}

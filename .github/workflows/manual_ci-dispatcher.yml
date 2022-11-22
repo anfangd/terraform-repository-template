@@ -2,7 +2,7 @@
 # 手動で操作された時に起動する Dispather Workflow
 # 入力値に従ってCI/CDを実行する
 #
-name: Manual CI/CD Dispatcher
+name: Manual | CI/CD Dispatcher
 run-name: ${{ github.actor }} kicked ${{ github.workflow }} 🚀 ${{ github.event.pull_request_title }}
 
 on: 
@@ -38,7 +38,8 @@ on:
         description: CodeBuild Project is
         required: true
         default: TerraformCI
-        type: options
+        type: choice
+        options:
           - TerraformCI
           - TerraformCD
 

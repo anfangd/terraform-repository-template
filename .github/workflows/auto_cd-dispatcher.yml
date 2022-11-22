@@ -1,0 +1,293 @@
+#
+# main ブランチへの push が実行された時に起動する Dispather Workflow
+# 変更差分を確認し、 terraform apply が必要なプロダクト/環境を判定してCIを実行する
+#
+name: Merge Branch CD Dispatcher
+run-name: ${{ github.actor }} kicked ${{ github.workflow }} 🚀 ${{ github.event.pull_request_title }}
+
+on: 
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/terraform/platforms/**'
+      - 'src/terraofrm/infrastructures/**'
+      - 'src/terraform/services/**'
+      - 'src/terraform/web-site/**'
+
+env:
+  CODE_BUILD_PROJECT: "TerraformCD"
+
+permissions:
+  pull-requests: read
+
+jobs:
+  test:
+    name: Test GitHub Actions
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Verify Github Contexts
+        run: |
+          cat $GITHUB_EVENT_PATH
+          echo "github.action ${{github.action}}" # string  現在実行中のアクションの名前。 GitHubは、現在のステップがスクリプトを実行する際に、特殊なキャラクターを削除するか、runという名前を使います。 同じジョブの中で同じアクションを複数回使う場合、名前には順番に番号が加えられます。 たとえば、実行する最初のスクリプトの名前はrun1で、2番目のスクリプトの名前はrun2というようになります。 同様に、actions/checkoutの2回目の呼び出しはactionscheckout2となります。
+          echo "github.action_path ${{github.action_path}}" # string    アクションが置かれているパス。 このパスを使用して、アクションと同じリポジトリにあるファイルに簡単にアクセスできます。 This attribute is only supported in composite actions.
+          echo "github.actor ${{github.actor}}" # string    ワークフローの実行を開始したユーザのログイン。
+          echo "github.base_ref ${{github.base_ref}}" # string  ワークフローの実行における base_ref またはPull Requestのターゲットブランチ。 このプロパティは、ワークフローの実行をトリガーするイベントが pull_request または pull_request_target のいずれかである場合にのみ使用できます。
+          echo "github.event ${{github.event}}" # オブジェクト    webhook ペイロードの完全なイベント。 詳しい情報については、「ワークフローをトリガーするイベント」を参照してください。 このコンテキストを使用して、イベントの個々のプロパティにアクセスできます。
+          echo "github.event_name ${{github.event_name}}" # string  ワークフローの実行をトリガーしたイベントの名前。
+          echo "github.event_path ${{github.event_path}}" # string  ランナー上の完全なイベントwebhookペイロードへのパス。
+          echo "github.head_ref ${{github.head_ref}}" # string  ワークフローの実行における head_ref またはPull Requestのソースブランチ。 このプロパティは、ワークフローの実行をトリガーするイベントが pull_request または pull_request_target のいずれかである場合にのみ使用できます。
+          echo "github.job ${{github.job}}" # string    現在のジョブのjob_id。
+          echo "github.ref ${{github.ref}}" # string    ワークフローの実行をトリガーしたブランチまたはタグ ref。 For branches this is the format refs/heads/<branch_name>, and for tags it is refs/tags/<tag_name>.
+          echo "github.repository ${{github.repository}}" # string  所有者およびリポジトリの名前。 Codertocat/Hello-Worldなどです。
+          echo "github.repository_owner ${{github.repository_owner}}" # string  リポジトリのオーナーの名前。 たとえばCodertocat。
+          echo "github.run_id ${{github.run_id}}" # string  リポジトリ内でユニークな各実行に対する番号。 この番号は、ワークフローの実行をやり直しても変化しません、
+          echo "github.run_number ${{github.run_number}}" # string  リポジトリ内の特定のワークフローの各実行に対するユニークな番号。 この番号は、ワークフローの最初の実行時に1で始まり、新たな実行ごとにインクリメントされます。 この番号は、ワークフローの実行をやり直しても変化しません、
+          echo "github.sha ${{github.sha}}" # string    ワークフローの実行をトリガーしたコミット SHA。
+          echo "github.token ${{github.token}}" # string    リポジトリにインストールされたGitHub Appの代わりに認証するためのトークン。 これは機能的にGITHUB_TOKENシークレットに等価です。 詳しい情報については「GITHUB_TOKENでの認証」を参照してください。
+          echo "github.workflow ${{github.workflow}}" # string  ワークフローの名前。 ワークフローファイルで name を指定していない場合、このプロパティの値は、リポジトリ内にあるワークフローファイルのフルパスになります。
+          echo "github.workspace ${{github.workspace}}" # string    checkoutアクションを使う際の、ステップにとってのデフォルトのワーキングディレクトリであり、リポジトリのデフォルトの場所です。
+
+  changes:
+    name: Filter Changes
+    runs-on: ubuntu-20.04
+    outputs:
+      platforms_code-resource: ${{ steps.filter.outputs.platforms_code-resource }}
+      platforms_code-resource_files: ${{ steps.filter.outputs.platforms_code-resource_files }}
+      platforms_monitoring: ${{ steps.filter.outputs.platforms_monitoring }}
+      platforms_monitoring_files: ${{ steps.filter.outputs.platforms_monitoring_files }}
+      platforms_platform_3_jc: ${{ steps.filter.outputs.platforms_platform_3_jc }}
+      platforms_platform_3_jc_files: ${{ steps.filter.outputs.platforms_platform_3_jc_files }}
+      infrastructures: ${{ steps.filter.outputs.infrastructures }}
+      infrastructures_files: ${{ steps.filter.outputs.infrastructures_files }}
+      services: ${{ steps.filter.outputs.services }}
+      services_files: ${{ steps.filter.outputs.services_files }}
+      web-sites: ${{ steps.filter.outputs.web-sites }}
+      web-sites_files: ${{ steps.filter.outputs.web-sites_files }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Filter Changes
+        id: filter
+        uses: dorny/paths-filter@v2
+        with:
+          list-files: json
+          filters: |
+            platforms_code-resource:
+              - 'src/terraform/platforms/code-resource/**'
+            platforms_monitoring:
+              - 'src/terraform/platforms/monitoring/**'
+            platforms_platform_3_jc:
+              - 'src/terraform/platforms/platform_3_jc/**'
+            infrastructures:
+              - 'src/terraofrm/infrastructures/**'
+            services:
+              - 'src/terraform/services/**'
+            web-sites:
+              - 'src/terraform/web-site/**'
+
+  platforms_code-resource:
+    name: Platforms / Code Resource
+    needs: changes
+    if: ${{ needs.changes.outputs.platforms_code-resource == 'true' }}
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        env_name: [ production ]
+    # uses: ./.github/workflows/run-codebuild.yml@main
+    # with:
+    #   env_name: ${{ matrix.env_name }}
+    #   code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
+    #   role_to_assume: ${{ env[ matrix.env_name ]}}
+    #   changed: ${{ toJSON(needs.changes.outputs.platforms_code-resource) }}
+    #   project_root_dir: src/terraform/platforms/code-resource
+    #   env_root_dir: src/terraform/platforms/code-resource/environments/${{ matrix.env_name }}
+    env:
+      code_build_project_name: TestBuildProject
+      role_to_assume: ${{ env[ matrix.env_name ]}}
+      changed: ${{ toJSON(needs.changes.outputs.platforms_code-resource) }}
+      project_root_dir: src/terraform/platforms/code-resource
+      env_root_dir: src/terraform/platforms/code-resource/environments/${{ matrix.env_name }}
+    steps:
+      - name: Echo Values
+        run: |
+          echo "DEBUG Echo Values"
+          echo "DEBUG   - Environment Name: ${{ matrix.env_name }}"
+          echo "DEBUG   - Changed Files   : ${{ env.code_build_project_name }}"
+          echo "DEBUG   - Role to Assume  : ${{ env.role_to_assume }}"
+          echo "DEBUG   - Changed Files   : ${{ env.changed }}"
+          echo "DEBUG   - Project Root Dir: ${{ env.project_root_dir }}"
+          echo "DEBUG   - Env Root Dir    : ${{ env.env_root_dir }}"
+
+  platforms_monitoring:
+    name: Platforms / Monitoring
+    needs: changes
+    if: ${{ needs.changes.outputs.platforms_monitoring == 'true' }}
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        env_name: [ production ]
+    # uses: ./.github/workflows/run-codebuild.yml@main
+    # with:
+    #   env_name: ${{ matrix.env_name }}
+    #   code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
+    #   role_to_assume: ${{ env[ matrix.env_name ]}}
+    #   changed: ${{ toJSON(needs.changes.outputs.platforms_monitoringe) }}
+    #   project_root_dir: src/terraform/platforms/monitoring
+    #   env_root_dir: src/terraform/platforms/monitoring/environments/${{ matrix.env_name }}
+    env:
+      production: arn:aws:iam::xxxxxxxxxxxx:role/xxxxxxxxx
+      code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
+      role_to_assume: ${{ env[ matrix.env_name ]}}
+      changed: ${{ toJSON(needs.changes.outputs.platforms_monitoring) }}
+      project_root_dir: src/terraform/platforms/monitoring
+      env_root_dir: src/terraform/platforms/monitoring/environments/${{ matrix.env_name }}
+    steps:
+      - name: Echo Values
+        run: |
+          echo "DEBUG Echo Values"
+          echo "DEBUG   - Environment Name: ${{ matrix.env_name }}"
+          echo "DEBUG   - Changed Files   : ${{ env.code_build_project_name }}"
+          echo "DEBUG   - Role to Assume  : ${{ env.role_to_assume }}"
+          echo "DEBUG   - Changed Files   : ${{ env.changed }}"
+          echo "DEBUG   - Project Root Dir: ${{ env.project_root_dir }}"
+          echo "DEBUG   - Env Root Dir    : ${{ env.env_root_dir }}"
+
+  platforms_platform_3_jc:
+    name: Platfomrs / Platform 3 JC
+    needs: changes
+    if: ${{ needs.changes.outputs.platforms_platform_3_jc == 'true' }}
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        env_name: [ production, pre-production, development ]
+    # uses: ./.github/workflows/run-codebuild.yml@main
+    # with:
+    #   env_name: ${{ matrix.env_name }}
+    #   code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
+    #   role_to_assume: ${{ env[ matrix.env_name ]}}
+    #   changed: ${{ toJSON(needs.changes.outputs.platforms_platform_3_jc_files) }}
+    #   project_root_dir: src/terraform/platforms/platform_3_jc
+    #   env_root_dir: src/terraform/platforms/platform_3_jc/environments/${{ matrix.env_name }}
+    env:
+      production: arn:aws:iam::xxxxxxxxxxxx:role/xxxxxxxxx
+      code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
+      role_to_assume: ${{ env[ matrix.env_name ]}}
+      changed: ${{ toJSON(needs.changes.outputs.platforms_platform_3_jc_files) }}
+      project_root_dir: src/terraform/platforms/platform_3_jc
+      env_root_dir: src/terraform/platforms/platform_3_jc/environments/${{ matrix.env_name }}
+    steps:
+      - name: Echo Values
+        run: |
+          echo "DEBUG Echo Values"
+          echo "DEBUG   - Environment Name: ${{ matrix.env_name }}"
+          echo "DEBUG   - Changed Files   : ${{ env.code_build_project_name }}"
+          echo "DEBUG   - Role to Assume  : ${{ env.role_to_assume }}"
+          echo "DEBUG   - Changed Files   : ${{ env.changed }}"
+          echo "DEBUG   - Project Root Dir: ${{ env.project_root_dir }}"
+          echo "DEBUG   - Env Root Dir    : ${{ env.env_root_dir }}"
+
+  infrastructures:
+    name: Infrastructures
+    needs: changes
+    if: ${{ needs.changes.outputs.infrastructures == 'true' }}
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        env_name: [ production, pre-production, development ]
+    # uses: ./.github/workflows/run-codebuild.yml@main
+    # with:
+    #   env_name: ${{ matrix.env_name }}
+    #   code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
+    #   role_to_assume: ${{ env[ matrix.env_name ]}}
+    #   changed: ${{ toJSON(needs.changes.outputs.infrastructures) }}
+    #   project_root_dir: src/terraform/infrastructures/infrastructures_1_di
+    #   env_root_dir: src/terraform/infrastructures/infrastructures_1_di/environments/${{ matrix.env_name }}
+    env:
+      production: arn:aws:iam::xxxxxxxxxxxx:role/xxxxxxxxx
+      code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
+      role_to_assume: ${{ env[ matrix.env_name ]}}
+      changed: ${{ toJSON(needs.changes.outputs.infrastructures) }}
+      project_root_dir: src/terraform/infrastructures/infrastructures_1_di
+      env_root_dir: src/terraform/infrastructures/infrastructures_1_di/environments/${{ matrix.env_name }}
+    steps:
+      - name: Echo Values
+        run: |
+          echo "DEBUG Echo Values"
+          echo "DEBUG   - Environment Name: ${{ matrix.env_name }}"
+          echo "DEBUG   - Changed Files   : ${{ env.code_build_project_name }}"
+          echo "DEBUG   - Role to Assume  : ${{ env.role_to_assume }}"
+          echo "DEBUG   - Changed Files   : ${{ env.changed }}"
+          echo "DEBUG   - Project Root Dir: ${{ env.project_root_dir }}"
+          echo "DEBUG   - Env Root Dir    : ${{ env.env_root_dir }}"
+
+  services:
+    name: Services
+    needs: changes
+    if: ${{ needs.changes.outputs.services == 'true' }}
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        env_name: [ production ]
+    # uses: ./.github/workflows/run-codebuild.yml@main
+    # with:
+    #   env_name: ${{ matrix.env_name }}
+    #   code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
+    #   role_to_assume: ${{ env[ matrix.env_name ]}}
+    #   changed: ${{ toJSON(needs.changes.outputs.services) }}
+    #   project_root_dir: src/terraform/services/Service_A
+    #   env_root_dir: src/terraform/services/Service_A/environments/${{ matrix.env_name }}
+    env:
+      production: arn:aws:iam::xxxxxxxxxxxx:role/xxxxxxxxx
+      code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
+      role_to_assume: ${{ env[ matrix.env_name ]}}
+      changed: ${{ toJSON(needs.changes.outputs.services) }}
+      project_root_dir: src/terraform/services/Service_A
+      env_root_dir: src/terraform/services/Service_A/environments/${{ matrix.env_name }}
+    steps:
+      - name: Echo Values
+        run: |
+          echo "DEBUG Echo Values"
+          echo "DEBUG   - Environment Name: ${{ matrix.env_name }}"
+          echo "DEBUG   - Changed Files   : ${{ env.code_build_project_name }}"
+          echo "DEBUG   - Role to Assume  : ${{ env.role_to_assume }}"
+          echo "DEBUG   - Changed Files   : ${{ env.changed }}"
+          echo "DEBUG   - Project Root Dir: ${{ env.project_root_dir }}"
+          echo "DEBUG   - Env Root Dir    : ${{ env.env_root_dir }}"
+
+  web-sites:
+    name: Web Sites
+    needs: changes
+    if: ${{ needs.changes.outputs.web-sites == 'true' }}
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        env_name: [ production ]
+    # uses: ./.github/workflows/run-codebuild.yml@main
+    # with:
+    #   env_name: ${{ matrix.env_name }}
+    #   code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
+    #   role_to_assume: ${{ env[ matrix.env_name ]}}
+    #   changed: ${{ toJSON(needs.changes.outputs.web-sites) }}
+    #   project_root_dir: src/terraform/web-sites/site-a
+    #   env_root_dir: src/terraform/web-sites/site-a/environments/${{ matrix.env_name }}
+    env:
+      production: arn:aws:iam::xxxxxxxxxxxx:role/xxxxxxxxx
+      code_build_project_name: ${{ env.CODE_BUILD_PROJECT }}
+      role_to_assume: ${{ env[ matrix.env_name ]}}
+      changed: ${{ toJSON(needs.changes.outputs.web-sites) }}
+      project_root_dir: src/terraform/web-sites/site-a
+      env_root_dir: src/terraform/web-sites/site-a/environments/${{ matrix.env_name }}
+    steps:
+      - name: Echo Values
+        run: |
+          echo "DEBUG Echo Values"
+          echo "DEBUG   - Environment Name: ${{ matrix.env_name }}"
+          echo "DEBUG   - Changed Files   : ${{ env.code_build_project_name }}"
+          echo "DEBUG   - Role to Assume  : ${{ env.role_to_assume }}"
+          echo "DEBUG   - Changed Files   : ${{ env.changed }}"
+          echo "DEBUG   - Project Root Dir: ${{ env.project_root_dir }}"
+          echo "DEBUG   - Env Root Dir    : ${{ env.env_root_dir }}"

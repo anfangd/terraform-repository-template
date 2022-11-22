@@ -1,27 +1,33 @@
-name: Run CodeBuild | Terraform CI/CD
+name: Auto Run CodeBuild | Terraform CI/CD
 run-name: ${{ github.actor }} kicked AWS CodeBuild | Terraform CI/CD 🚀 ${{ github.event.inputs.code_build_project_name }}
 
 on:
   workflow_call:
     inputs:
       env_name:
-        required: true
+        description: Environment Name
         type: string
+        required: true
       code_build_project_name:
+        description: AWS CodeBuild Project Name
+        type: string 
         required: true
-        type: string
       role_to_assume:
-        required: true
+        description: Role Name to Assume
         type: string
+        required: true
       changed:
-        required: true
+        description: JSON String of Changed Files
         type: string
+        required: true
       project_root_dir:
-        required: true
+        description: Project Root Directory 
         type: string
+        required: true
       env_root_dir:
-        required: true
+        description: Environment Root Directory
         type: string
+        required: true
 
 jobs:
   run-code-build:
@@ -50,21 +56,21 @@ jobs:
           echo layers=$(echo ${{ toJSON(env.inputs_changed) }} | jq -r ' .[] | select( startswith( "${{ env.inputs_env_root_dir }}" ) )' | sed -e 's|${{ env.inputs_env_root_dir }}/||g' | cut -d / -f 1 | uniq ) >> $GITHUB_ENV
           echo DEBUG ${{ env.inputs_changed }}
 
-      - name: DEBUG No Target Layer
-        if: ${{ env.count == 0 && env.envs_yml == 0 }}
-        run: |
-          echo Count: ${{ env.count }}. No Target Layer.
+      # - name: DEBUG No Target Layer
+      #   if: ${{ env.count == 0 && env.envs_yml == 0 }}
+      #   run: |
+      #     echo DEBUG Count: ${{ env.count }}. No Target Layer.
 
-      - name: DEBUG Specific Target Layers
-        if: ${{ env.count != 0 && env.envs_yml == 0 }}
-        run: |
-          echo Count: ${{ env.count }}. Specific Target Layers.
-          echo Layers: ${{ env.layers }}
+      # - name: DEBUG Specific Target Layers
+      #   if: ${{ env.count != 0 && env.envs_yml == 0 }}
+      #   run: |
+      #     echo DEBUG Count: ${{ env.count }}. Specific Target Layers.
+      #     echo DEBUG Layers: ${{ env.layers }}
       
-      - name: DEBUG All Layers
-        if: ${{ env.envs_yml != 0 }}
-        run: |
-          echo Count: ${{ env.count }}. All Layers.
+      # - name: DEBUG All Layers
+      #   if: ${{ env.envs_yml != 0 }}
+      #   run: |
+      #     echo DEBUG Count: ${{ env.count }}. All Layers.
 
       - name: Checkout Repository
         uses: actions/checkout@v3
@@ -74,7 +80,7 @@ jobs:
         if: ${{ env.count != 0 || env.envs_yml != 0 }}
         run: |
           echo DEBUG Configure AWS credentials
-          echo RoleToAssume: ${{ env.role_to_assume }}
+          echo DEBUG - RoleToAssume: ${{ env.role_to_assume }}
       #   uses: aws-actions/configure-aws-credentials@v1
       #   with:
       #     role-to-assume: ${{ env.role_to_assume }}
@@ -85,10 +91,10 @@ jobs:
         if: ${{ env.count != 0 || env.envs_yml != 0 }}
         run: |
           echo DEBUG Run CodeBuild
-          echo CodeBuild Project Name: ${{ env.code_build_project_name }}
-          echo Env: ${{ env.inputs_env_name }}
-          echo Layers: ${{ env.layers }}
-          echo All Layer: ${{ env.envs_yml}}
+          echo DEBUG - CodeBuild Project Name: ${{ env.code_build_project_name }}
+          echo DEBUG - Env: ${{ env.inputs_env_name }}
+          echo DEBUG - Layers: ${{ env.layers }}
+          echo DEBUG - All Layer: ${{ env.envs_yml}}
       #   uses: aws-actions/aws-codebuild-run-build@v1
       #   with:
       #     project-name: ${{ env.code_build_project_name }}

@@ -30,7 +30,7 @@ on:
          - production
          - all
       layer:
-        description: Layer Name is ( Camma Separated )
+        description: Layer Name is ( Comma Separated )
         required: false
         default: all
         type: string

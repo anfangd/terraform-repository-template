@@ -4,7 +4,7 @@
 #
 # 環境とレイヤーの判定は Auto Run CodeBuild 側で実施する
 #
-name: Auto CI Dispatcher
+name: Pull Request | CI Dispatcher
 run-name: ${{ github.actor }} kicked ${{ github.workflow }} 🚀 ${{ github.event.pull_request_title }}
 
 on: 
